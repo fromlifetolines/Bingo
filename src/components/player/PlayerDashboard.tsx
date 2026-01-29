@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Trophy, RefreshCw, Lock, CheckCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useGameStore } from '../../store/gameStore';
@@ -155,7 +155,11 @@ export const PlayerDashboard = () => {
     }, [joinRoom]);
 
     // V4.5 Local History (The Permanent Notebook)
-    const [myHistory, setMyHistory] = useState<number[]>([]);
+    // V4.7 Stateless History (Crash Prevention)
+    // We use a REF to store history so it doesn't trigger effect loops.
+    const markedRef = useRef<number[]>([]);
+    // Manual re-render trigger
+    const [, forceUpdate] = useState(0);
 
     useEffect(() => {
         if (currentNumber) {
@@ -164,24 +168,24 @@ export const PlayerDashboard = () => {
                 const strNum = currentNumber.toString();
                 const idx = localCardNumbers.findIndex(n => n.toString() === strNum);
 
-                // V4.5 HISTORY FIX: Add to local history (Append Only)
+                // V4.7 STATELESS UPDATE
                 if (idx !== -1) {
-                    setMyHistory(prev => {
-                        if (prev.includes(idx)) return prev;
-                        console.log("⚡️ V4.5 SAVING TO HISTORY:", idx);
-                        return [...prev, idx];
-                    });
+                    if (!markedRef.current.includes(idx)) {
+                        console.log("⚡️ V4.7 ADDING TO REF (Safe):", idx);
+                        markedRef.current.push(idx);
 
-                    // Also try to save to store for sync consistency, but rely on myHistory for UI
-                    if (myPlayer && !myPlayer.markedIndices.includes(idx)) {
-                        const store = useGameStore.getState();
-                        store.markNumber(myPlayer.id, idx);
+                        // ONE Render Trigger
+                        forceUpdate(n => n + 1);
+
+                        // Sync to store silently
+                        if (myPlayer && !myPlayer.markedIndices.includes(idx)) {
+                            useGameStore.getState().markNumber(myPlayer.id, idx);
+                        }
                     }
-                    if (navigator.vibrate) navigator.vibrate(200);
                 }
             }
         }
-    }, [currentNumber, localCardNumbers, myPlayer]);
+    }, [currentNumber, localCardNumbers]); // Removed myPlayer dependency to be safer
 
     useEffect(() => {
         // Sync Visuals
@@ -248,7 +252,7 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-green-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V4.5 (HISTORY)
+                PLAYER V4.7 (STATELESS)
             </div>
 
             {/* Connection Status Indicator */}
@@ -283,7 +287,7 @@ export const PlayerDashboard = () => {
             <div className="p-4 flex flex-col items-center gap-6 mt-4">
                 <BingoCard
                     numbers={displayCard}
-                    markedIndices={[...new Set([...(myPlayer?.markedIndices || []), ...myHistory])]} // V4.5 Merge History
+                    markedIndices={[...new Set([...(myPlayer?.markedIndices || []), ...markedRef.current])]} // V4.7 Use Ref
                     currentNumber={currentNumber}
                     onMark={handleMark}
                 />
