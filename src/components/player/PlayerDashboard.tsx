@@ -38,7 +38,7 @@ export const PlayerDashboard = () => {
         markedIndices: [],
         isLocked: false,
         hasBingo: false,
-        joinedAt: Date.now()
+        joinedAt: 0 // V6.1 Fix: Avoid impure Date.now()
     } : undefined);
 
     useEffect(() => {
@@ -97,7 +97,7 @@ export const PlayerDashboard = () => {
         const card = generateInline();
         console.log("⚡️ V4.0 INLINE GEN (JOIN):", card);
 
-        updatePlayerCard(newId, card);
+        updatePlayerCard(persistentId, card); // FIXED: Was newId
 
         setLocalCardNumbers(card);
         setHasJoined(true);
