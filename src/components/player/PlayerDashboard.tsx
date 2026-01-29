@@ -8,7 +8,7 @@ import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.9 SYNC: INSTANT UPDATE READY
+// V4.0 SYNC: ANIMATION AWARE
 export const PlayerDashboard = () => {
     const { joinRoom, connectionStatus, lockMyCard } = usePeerConnection();
     const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard, isRolling } = useGameStore();
@@ -77,7 +77,7 @@ export const PlayerDashboard = () => {
 
         // Inline Gen
         const card = generateInline();
-        console.log("⚡️ V3.9 INLINE GEN (JOIN):", card);
+        console.log("⚡️ V4.0 INLINE GEN (JOIN):", card);
 
         updatePlayerCard(newId, card);
 
@@ -87,7 +87,7 @@ export const PlayerDashboard = () => {
     };
 
     const handleManualGen = () => {
-        console.log("⚡️ V3.9 MANUAL TRIGGER");
+        console.log("⚡️ V4.0 MANUAL TRIGGER");
 
         const newCard = generateInline();
         setLocalCardNumbers(newCard);
@@ -169,6 +169,7 @@ export const PlayerDashboard = () => {
     }, [currentNumber, localCardNumbers]);
 
     useEffect(() => {
+        // Sync Visuals
         if (isRolling) setLocalRolling(true);
         else setLocalRolling(false);
     }, [isRolling]);
@@ -178,7 +179,7 @@ export const PlayerDashboard = () => {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
                 <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.9 (SYNC)
+                    PLAYER V4.0 (SYNC)
                 </div>
                 <div className="w-full max-w-sm bg-dark-surface p-6 rounded-xl border border-gray-800 shadow-2xl space-y-4">
                     <h1 className="text-3xl font-black text-center text-white italic">NEON<span className="text-neon-cyan">BINGO</span></h1>
@@ -206,7 +207,7 @@ export const PlayerDashboard = () => {
     if (!showGame) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-8">
-                <div className="fixed top-0 right-0 bg-orange-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.9 (SYNC)</div>
+                <div className="fixed top-0 right-0 bg-orange-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V4.0 (SYNC)</div>
                 {/* Connection Status Indicator */}
                 <div className="absolute top-4 left-4 flex items-center gap-2">
                     <div className={`w-3 h-3 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
@@ -232,7 +233,7 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-green-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V3.9 (SYNC)
+                PLAYER V4.0 (SYNC)
             </div>
 
             {/* Connection Status Indicator */}
