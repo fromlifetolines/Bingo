@@ -8,7 +8,7 @@ import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.3 FAIL-SAFE: MANUAL FALLBACK FOR BLANK SCREENS
+// V3.4 AUTO: AUTOMATED CARD GEN + FALLBACK
 export const PlayerDashboard = () => {
     const { joinRoom, connectionStatus, lockMyCard } = usePeerConnection();
     const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard, isRolling } = useGameStore();
@@ -42,6 +42,14 @@ export const PlayerDashboard = () => {
         updatePlayerCard(newId, card);
         setHasJoined(true);
     };
+
+    const handleManualGen = () => {
+        console.log("⚡️ V3.4 MANUAL TRIGGER");
+        const newCard = generateCard();
+        let id = myPlayer?.id;
+        if (!id) id = localStorage.getItem('my_bingo_player_id') || 'temp';
+        updatePlayerCard(id, newCard);
+    }
 
     const handleReroll = () => {
         if (status !== 'LOBBY' || !myPlayer || myPlayer.isLocked) return;
@@ -78,32 +86,51 @@ export const PlayerDashboard = () => {
         }));
     };
 
+    // Persistence Check
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const joinId = params.get('join');
-        useGameStore.getState().checkSessionMismatch(joinId);
+        const store = useGameStore.getState();
 
+        // Stuck Timer
         const stuckTimer = setTimeout(() => {
-            if (joinId && !useGameStore.getState().roomId) {
+            if (joinId && !store.roomId) {
                 setIsStuck(true);
             }
         }, 2000);
 
-        const storedPlayers = useGameStore.getState().players;
+        // Session Restore
         const savedId = localStorage.getItem('my_bingo_player_id');
-
         if (savedId) {
-            const existing = storedPlayers.find(p => p.id === savedId);
+            const existing = store.players.find(p => p.id === savedId);
             if (existing) {
                 setPlayerName(existing.name);
                 setHasJoined(true);
-                const targetRoom = useGameStore.getState().roomId || joinId;
+                const targetRoom = store.roomId || joinId;
                 if (targetRoom) joinRoom(targetRoom, existing.name);
             }
         }
 
         return () => clearTimeout(stuckTimer);
     }, [joinRoom]);
+
+    // V3.4 AUTO-GEN ON MOUNT
+    useEffect(() => {
+        // Attempt to auto-fill card if missing on EVERY render cycle where hasJoined is true
+        // This ensures it catches connection latencies
+        if (hasJoined) {
+            const savedId = localStorage.getItem('my_bingo_player_id') || 'temp';
+            const store = useGameStore.getState();
+            const me = store.players.find(p => p.id === savedId);
+
+            // If local store sees empty card...
+            if (!me || !me.card || me.card.length === 0) {
+                console.log("⚡️ V3.4 AUTO-GEN TRIGGER");
+                const newCard = generateCard();
+                updatePlayerCard(savedId, newCard);
+            }
+        }
+    }, [hasJoined, players, updatePlayerCard, generateCard]);
 
     useEffect(() => {
         if (currentNumber) {
@@ -129,7 +156,7 @@ export const PlayerDashboard = () => {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4 bg-deep-gray p-4">
                 <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.3 (FAIL-SAFE)
+                    PLAYER V3.4 (AUTO)
                 </div>
                 <h2 className="text-xl font-bold text-neon-cyan animate-pulse">Connecting to Host...</h2>
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
@@ -148,7 +175,7 @@ export const PlayerDashboard = () => {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
                 <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.3 (FAIL-SAFE)
+                    PLAYER V3.4 (AUTO)
                 </div>
                 <div className="w-full max-w-sm bg-dark-surface p-6 rounded-xl border border-gray-800 shadow-2xl space-y-4">
                     <h1 className="text-3xl font-black text-center text-white italic">NEON<span className="text-neon-cyan">BINGO</span></h1>
@@ -170,24 +197,19 @@ export const PlayerDashboard = () => {
         )
     }
 
-    // FAIL-SAFE MANUAL BUTTON (Replacing Blank Screen)
+    // FAIL-SAFE MANUAL BUTTON (Only shows if AUTO failed)
     if (!myPlayer.card || myPlayer.card.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-8">
-                <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.3 (FAIL-SAFE)</div>
-                <h1 className="text-3xl font-bold mb-8 text-center text-red-400">Card Not Found?</h1>
-                <p className="mb-8 text-center text-gray-400">If your screen is blank, click below to force a new card.</p>
+                <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.4 (AUTO-TRIGGERED)</div>
+                <h1 className="text-3xl font-bold mb-8 text-center text-red-400">Loading Card...</h1>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan mb-8"></div>
+                <p className="mb-8 text-center text-gray-400">If this takes too long, click below:</p>
                 <button
-                    onClick={() => {
-                        console.log("⚡️ V3.3 MANUAL CARD GENERATION");
-                        const newCard = generateCard();
-                        // Update store directly using player ID
-                        updatePlayerCard(myPlayer.id, newCard);
-                        // Force UI refresh if needed (usually store update triggers it)
-                    }}
+                    onClick={handleManualGen}
                     className="bg-neon-magenta hover:bg-neon-cyan text-white text-2xl font-black px-8 py-6 rounded-xl shadow-[0_0_20px_rgba(255,0,255,0.5)] border-2 border-white animate-bounce active:scale-95 transition-all"
                 >
-                    CLICK TO GET CARD
+                    FORCE LOAD CARD
                 </button>
             </div>
         );
@@ -198,7 +220,7 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V3.3 (FAIL-SAFE)
+                PLAYER V3.4 (AUTO)
             </div>
 
             {(localRolling || isRolling) && (

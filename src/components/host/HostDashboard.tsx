@@ -8,7 +8,7 @@ import { QRCodeDisplay } from './QRCodeDisplay';
 import { RecentNumbers } from './RecentNumbers';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.3 FAIL-SAFE: REMOVED LOCKS + TRY/CATCH
+// V3.4 STABLE: FORCE UNLOCKED + AUTO-RESET
 export const HostDashboard = () => {
     const { createRoom, connectionStatus, startGame, broadcast } = usePeerConnection();
     const { roomId, currentNumber, drawnNumbers, players, status, drawNumber: storeDrawNumber } = useGameStore();
@@ -29,51 +29,50 @@ export const HostDashboard = () => {
     };
 
     const handleStrictDraw = () => {
-        // FAIL-SAFE: ALLOW CLICKING EVEN IF "ROLLING" (To unstick)
-        // if (isRolling) return; <-- REMOVED LOCK
+        console.log("⚡️ V3.4 FORCE DRAW/RESET");
 
-        console.log("⚡️ V3.3 MANUAL DRAW TRIGGER");
+        // 1. FORCE RESET STATE (Fixes "Stuck" bug)
+        // Even if rolling, we reset first.
+        setIsRolling(false);
+        useGameStore.getState().setRolling(false);
 
-        // 1. VISUAL & STATE
-        setIsRolling(true);
-        useGameStore.getState().setRolling(true);
+        // 2. START FRESH SEQUENC (Next Frame)
+        requestAnimationFrame(() => {
+            setIsRolling(true);
+            useGameStore.getState().setRolling(true);
 
-        // 2. BROADCAST ROLLING 
-        broadcast({ type: 'ROLLING' });
+            // Broadcast ROLLING
+            broadcast({ type: 'ROLLING' });
 
-        // 3. WAIT 
-        setTimeout(() => {
-            try {
-                // 4. GENERATE
-                storeDrawNumber();
-                const newState = useGameStore.getState();
-                const newNum = newState.currentNumber;
+            // 3. ROBUST TIMER
+            setTimeout(() => {
+                try {
+                    storeDrawNumber();
+                    const newState = useGameStore.getState();
+                    const newNum = newState.currentNumber;
 
-                // 5. UPDATE LOCAL
-                setIsRolling(false);
-                useGameStore.getState().setRolling(false);
-                playPop();
+                    setIsRolling(false);
+                    useGameStore.getState().setRolling(false);
+                    playPop();
 
-                // 6. BROADCAST RESULT
-                if (newNum) {
-                    broadcast({ type: 'DRAW_NUMBER', payload: newNum });
-                    announceNumber(newNum);
+                    if (newNum) {
+                        broadcast({ type: 'DRAW_NUMBER', payload: newNum });
+                        announceNumber(newNum);
+                    }
+                } catch (e) {
+                    console.error("❌ DRAW FAILED:", e);
+                    setIsRolling(false); // Force unlock
+                    useGameStore.getState().setRolling(false);
                 }
-            } catch (e) {
-                console.error("❌ DRAW FAILED:", e);
-                // Force reset on error
-                setIsRolling(false);
-                useGameStore.getState().setRolling(false);
-                alert("Draw failed. Please click again.");
-            }
-        }, 2500);
+            }, 2500);
+        });
     };
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
-            {/* DEBUG TAG V3.3 */}
+            {/* DEBUG TAG V3.4 */}
             <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V3.3 (UNLOCKED)
+                HOST V3.4 (STABLE)
             </div>
 
             {/* Sidebar */}
@@ -143,12 +142,11 @@ export const HostDashboard = () => {
                     ) : (
                         <button
                             onClick={handleStrictDraw}
-                            // UNLOCKED: DISABLED REMOVED so user can spam if stuck
-                            // disabled={status !== 'PLAYING' || isRolling} 
+                            // UNLOCKED: NEVER DISABLED allow reset
                             disabled={status !== 'PLAYING'}
                             className="flex items-center gap-3 px-10 py-5 bg-neon-cyan text-black font-black text-2xl rounded-full hover:scale-105 active:scale-95 transition-transform duration-100 shadow-[0_0_30px_rgba(0,243,255,0.3)] disabled:opacity-50"
                         >
-                            <Play fill="black" /> {isRolling ? 'ROLLING...' : 'DRAW NUMBER'}
+                            <Play fill="black" /> {isRolling ? 'ROLLING... (Click to Reset)' : 'DRAW NUMBER'}
                         </button>
                     )}
 
