@@ -137,14 +137,23 @@ export const useGameStore = create<GameState>()(
             },
 
             joinGame: (name, playerId) => set((state) => {
-                // 1. STRICT DEDUPLICATION (ID OR NAME)
-                // If we see the same ID, OR the same Name, we treat it as the same person to prevent "Infinite Clones"
-                if (state.players.some(p => p.id === playerId || p.name === name)) {
-                    // Update status if needed (optional) but do not add row
-                    return state;
+                const existingIndex = state.players.findIndex(p => p.id === playerId);
+
+                // 1. UPDATE EXISTING (Connection Restore)
+                // If player exists, we merge new data (like name update) but keep game state.
+                // This ensures re-connections are acknowledged.
+                if (existingIndex !== -1) {
+                    const updatedPlayers = [...state.players];
+                    updatedPlayers[existingIndex] = {
+                        ...updatedPlayers[existingIndex],
+                        name, // Update name in case it changed
+                        // We could reset 'isLocked' here if we wanted to force re-lock, 
+                        // but keeping state is usually better for reconnection.
+                    };
+                    return { players: updatedPlayers };
                 }
 
-                // 2. ADD NEW ONLY
+                // 2. ADD NEW
                 return {
                     players: [...state.players, {
                         id: playerId,

@@ -104,7 +104,7 @@ export const HostDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
             <div className="fixed top-0 left-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V5.5 (FIXED UI)
+                HOST V5.6 (STABLE)
             </div>
 
             {/* Sidebar */}
