@@ -8,11 +8,11 @@ import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.8 FINAL: INLINE GENERATION (Hard-coded safety)
+// V3.9 SYNC: INSTANT UPDATE READY
 export const PlayerDashboard = () => {
     const { joinRoom, connectionStatus, lockMyCard } = usePeerConnection();
     const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard, isRolling } = useGameStore();
-    const { checkBingo } = useBingoLogic(); // generateCard removed (we do it inline)
+    const { checkBingo } = useBingoLogic();
     const { playWin } = useSoundEffects();
 
     const [playerName, setPlayerName] = useState('');
@@ -21,7 +21,7 @@ export const PlayerDashboard = () => {
 
     // V3.7 Force State
     const [hasCardLocal, setHasCardLocal] = useState(false);
-    // V3.8 Local Numbers State (to guarantee display even if store lags)
+    // V3.8 Local Numbers State
     const [localCardNumbers, setLocalCardNumbers] = useState<number[]>([]);
 
     // Fallback ID from local storage
@@ -43,7 +43,6 @@ export const PlayerDashboard = () => {
     useEffect(() => {
         if (myPlayer?.card && myPlayer.card.length > 0) {
             setHasCardLocal(true);
-            // Ensure local state matches store if store updates first
             if (localCardNumbers.length === 0) {
                 setLocalCardNumbers(myPlayer.card);
             }
@@ -62,7 +61,7 @@ export const PlayerDashboard = () => {
             const j = Math.floor(Math.random() * (i + 1));
             [pool[i], pool[j]] = [pool[j], pool[i]];
         }
-        return pool.slice(0, 16); // 4x4 = 16 numbers
+        return pool.slice(0, 16);
     };
 
     const handleJoin = () => {
@@ -78,7 +77,7 @@ export const PlayerDashboard = () => {
 
         // Inline Gen
         const card = generateInline();
-        console.log("⚡️ V3.8 INLINE GEN (JOIN):", card);
+        console.log("⚡️ V3.9 INLINE GEN (JOIN):", card);
 
         updatePlayerCard(newId, card);
 
@@ -88,17 +87,12 @@ export const PlayerDashboard = () => {
     };
 
     const handleManualGen = () => {
-        console.log("⚡️ V3.8 MANUAL TRIGGER");
+        console.log("⚡️ V3.9 MANUAL TRIGGER");
 
-        // 1. Generate Inline
         const newCard = generateInline();
-        console.log("⚡️ GENERATED:", newCard);
-
-        // 2. Local View Update (Immediate)
         setLocalCardNumbers(newCard);
         setHasCardLocal(true);
 
-        // 3. Store Update (Background)
         const targetId = myPlayer?.id || localStorage.getItem('my_bingo_player_id');
         if (targetId) {
             updatePlayerCard(targetId, newCard);
@@ -108,7 +102,7 @@ export const PlayerDashboard = () => {
     const handleReroll = () => {
         if (status !== 'LOBBY' || !myPlayer || myPlayer.isLocked) return;
         const newCard = generateInline();
-        setLocalCardNumbers(newCard); // Update local view immediately
+        setLocalCardNumbers(newCard);
         rerollCard(myPlayer.id, newCard);
     };
 
@@ -150,7 +144,6 @@ export const PlayerDashboard = () => {
             if (existing) {
                 setPlayerName(existing.name);
                 setHasJoined(true);
-                // Sync existing card to local state if present
                 if (existing.card && existing.card.length > 0) {
                     setLocalCardNumbers(existing.card);
                     setHasCardLocal(true);
@@ -167,7 +160,6 @@ export const PlayerDashboard = () => {
             if (localCardNumbers.length > 0) {
                 const strNum = currentNumber.toString();
                 const idx = localCardNumbers.findIndex(n => n.toString() === strNum);
-                // Use local logic for marking feedback
                 if (idx !== -1 && myPlayer && !myPlayer.markedIndices.includes(idx)) {
                     handleMark(idx);
                     if (navigator.vibrate) navigator.vibrate(200);
@@ -186,7 +178,7 @@ export const PlayerDashboard = () => {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
                 <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.8 (FINAL)
+                    PLAYER V3.9 (SYNC)
                 </div>
                 <div className="w-full max-w-sm bg-dark-surface p-6 rounded-xl border border-gray-800 shadow-2xl space-y-4">
                     <h1 className="text-3xl font-black text-center text-white italic">NEON<span className="text-neon-cyan">BINGO</span></h1>
@@ -208,15 +200,13 @@ export const PlayerDashboard = () => {
         )
     }
 
-    // Determine what card to show
-    // Prefer localCardNumbers (immediate), then store data
     const displayCard = localCardNumbers.length > 0 ? localCardNumbers : (myPlayer?.card || []);
     const showGame = hasCardLocal || displayCard.length > 0;
 
     if (!showGame) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-8">
-                <div className="fixed top-0 right-0 bg-orange-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.8 (FINAL)</div>
+                <div className="fixed top-0 right-0 bg-orange-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.9 (SYNC)</div>
                 {/* Connection Status Indicator */}
                 <div className="absolute top-4 left-4 flex items-center gap-2">
                     <div className={`w-3 h-3 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
@@ -242,7 +232,7 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-green-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V3.8 (FINAL)
+                PLAYER V3.9 (SYNC)
             </div>
 
             {/* Connection Status Indicator */}
