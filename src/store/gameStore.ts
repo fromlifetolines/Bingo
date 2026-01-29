@@ -82,9 +82,20 @@ try {
 }
 // --------------------------------------------------    
 
+// Helper: Persistent ID
+const getPersistentId = () => {
+    let id = localStorage.getItem('bingo_player_id');
+    if (!id) {
+        id = Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('bingo_player_id', id);
+    }
+    return id;
+};
+
 export const useGameStore = create<GameState>()(
     persist(
         (set, get) => ({
+            playerId: getPersistentId(), // Stores the persistent ID
             status: 'LOBBY',
             role: null,
             roomId: null,
@@ -126,9 +137,10 @@ export const useGameStore = create<GameState>()(
             },
 
             joinGame: (name, playerId) => set((state) => {
-                // 1. STRICT DEDUPLICATION
-                // If player ID exists, we do NOTHING. This prevents "Infinite H" where re-joins add rows.
-                if (state.players.some(p => p.id === playerId)) {
+                // 1. STRICT DEDUPLICATION (ID OR NAME)
+                // If we see the same ID, OR the same Name, we treat it as the same person to prevent "Infinite Clones"
+                if (state.players.some(p => p.id === playerId || p.name === name)) {
+                    // Update status if needed (optional) but do not add row
                     return state;
                 }
 

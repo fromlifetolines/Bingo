@@ -70,11 +70,17 @@ export const PlayerDashboard = () => {
 
         if (!playerName || !joinId) return;
 
-        const newId = crypto.randomUUID();
-        localStorage.setItem('my_bingo_player_id', newId);
+        // V5.5 FIX: USE PERSISTENT ID
+        // Note: We use the helper logic or access from store if exposed. 
+        // Since we didn't expose current user ID in the hook return, we grab it from localStorage provided by the store logic
+        // OR we can just rely on the store's state if we exposed it. 
+        // For safety, let's grab it from localStorage 'bingo_player_id' which the store sets as main source of truth.
+        const persistentId = localStorage.getItem('bingo_player_id') || crypto.randomUUID();
+        localStorage.setItem('bingo_player_id', persistentId); // Ensure it's there
+        localStorage.setItem('my_bingo_player_id', persistentId); // Sync with old key just in case
 
         // V5.2 FIX: ADD TO LOCAL STORE
-        useGameStore.getState().joinGame(playerName, newId);
+        useGameStore.getState().joinGame(playerName, persistentId);
 
         joinRoom(joinId, playerName);
 
