@@ -122,7 +122,7 @@ export const HostDashboard = () => {
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative overflow-hidden">
             {/* V6.0 FLUID BACKGROUND */}
             <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen">
-                <FluidCanvas ref={fluidRef} />
+                {/* <FluidCanvas ref={fluidRef} /> */}
             </div>
 
             <div className="fixed top-0 left-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">

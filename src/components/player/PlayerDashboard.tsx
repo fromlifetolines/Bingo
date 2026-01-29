@@ -289,7 +289,7 @@ export const PlayerDashboard = () => {
         <div className="min-h-screen bg-deep-gray text-white flex flex-col relative overflow-hidden">
             {/* V6.0 FLUID BACKGROUND */}
             <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen">
-                <FluidCanvas ref={fluidRef} />
+                {/* <FluidCanvas ref={fluidRef} /> */}
             </div>
 
             {/* Header */}
