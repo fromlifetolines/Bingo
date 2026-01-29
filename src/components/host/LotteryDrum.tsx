@@ -16,13 +16,7 @@ const BALL_COLORS = {
 
 // 4x4 mode ranges for coloring/lettering (approximate)
 const getLetter = (num: number) => {
-    if (num <= 19) return 'N';
-    if (num <= 38) return 'E';
-    if (num <= 57) return 'O';
-    return 'N'; // Just using NEON for 4 columns? Or just stick to standard?
-    // User said "16-Grid". Standard 75 ball has 5 ranges. 
-    // Let's stick to simple "Ball" logic or standard Bingo letters if using 1-75.
-    // 1-15 B, 16-30 I ... 
+    // Standard Bingo Ranges
     if (num <= 15) return 'B';
     if (num <= 30) return 'I';
     if (num <= 45) return 'N';

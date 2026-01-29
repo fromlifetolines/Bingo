@@ -103,16 +103,12 @@ export const HostDashboard = () => {
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
-            {/* DEBUG TAG V4.1 */}
-            <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V4.9 (SPEED 1s)
-            </div>
 
             {/* Sidebar */}
             <div className="col-span-3 space-y-8 border-r border-gray-800 pr-6 flex flex-col h-full">
                 <div>
                     <h1 className="text-3xl font-black italic bg-gradient-to-r from-neon-cyan to-neon-magenta bg-clip-text text-transparent">
-                        NEON BINGO
+                        HOW BINGO
                     </h1>
                     <div className="flex items-center gap-2 mt-2">
                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${status === 'LOBBY' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-green-500/20 text-green-500'}`}>

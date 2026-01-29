@@ -29,7 +29,7 @@ function App() {
       <div className="max-w-md w-full text-center space-y-12">
         <div className="space-y-4">
           <h1 className="text-6xl font-black bg-gradient-to-r from-neon-cyan to-neon-magenta bg-clip-text text-transparent italic tracking-tighter">
-            NEON<br />BINGO
+            HOW<br />BINGO
           </h1>
           <p className="text-gray-400 text-lg">The Ultimate Real-Time Event Experience</p>
         </div>
