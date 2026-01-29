@@ -79,7 +79,7 @@ export const HostDashboard = () => {
                     try { playDingSound(); } catch (e) { }
 
                     // 6. BROADCAST (Delayed by 500ms AFTER Host reveal)
-                    // V5.1: FAST SYNC (800ms Anim + 500ms Delay)
+                    // V5.2: TURBO SYNC (500ms Anim + 500ms Delay)
                     setTimeout(() => {
                         const freshBroadcast = useGameStore.getState().broadcastEvent;
                         if (freshBroadcast) {
@@ -92,7 +92,7 @@ export const HostDashboard = () => {
                     setIsRolling(false);
                     useGameStore.getState().setRolling(false);
                 }
-            }, 800); // V5.1: Fast 0.8s Animation
+            }, 500); // V5.2: Turbo 0.5s Animation
 
         } catch (error) {
             console.error("Draw setup failed", error);
@@ -103,6 +103,9 @@ export const HostDashboard = () => {
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
+            <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
+                HOST V5.2 (TURBO)
+            </div>
 
             {/* Sidebar */}
             <div className="col-span-3 space-y-8 border-r border-gray-800 pr-6 flex flex-col h-full">
