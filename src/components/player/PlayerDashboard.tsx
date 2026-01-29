@@ -233,7 +233,7 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-green-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V4.0 (SYNC)
+                PLAYER V4.2 (AUTO-MARK)
             </div>
 
             {/* Connection Status Indicator */}
@@ -269,6 +269,7 @@ export const PlayerDashboard = () => {
                 <BingoCard
                     numbers={displayCard}
                     markedIndices={myPlayer?.markedIndices || []}
+                    currentNumber={currentNumber} // V4.2
                     onMark={handleMark}
                 />
 
