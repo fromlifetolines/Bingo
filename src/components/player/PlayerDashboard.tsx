@@ -8,6 +8,7 @@ import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
 
+// V3.1 REWRITE: FORCED UPDATE + AGGRESSIVE AUTO-GEN
 export const PlayerDashboard = () => {
     const { joinRoom, connectionStatus, lockMyCard } = usePeerConnection();
     const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard, isRolling } = useGameStore();
@@ -18,51 +19,7 @@ export const PlayerDashboard = () => {
     const [hasJoined, setHasJoined] = useState(false);
     const [isStuck, setIsStuck] = useState(false);
 
-    // Persistence Check on Mount
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const joinId = params.get('join');
-
-        // Check for mismatch BEFORE trying to restore
-        useGameStore.getState().checkSessionMismatch(joinId);
-
-        // Stuck Timer: Show retry button quickly (2s) if connection hangs
-        const stuckTimer = setTimeout(() => {
-            if (joinId && !useGameStore.getState().roomId) {
-                setIsStuck(true);
-            }
-        }, 2000);
-
-        const storedPlayers = useGameStore.getState().players;
-        const savedId = localStorage.getItem('my_bingo_player_id');
-
-        if (savedId) {
-            const existing = storedPlayers.find(p => p.id === savedId);
-            if (existing) {
-                setPlayerName(existing.name);
-                setHasJoined(true);
-                // Important: Use the joinId from URL if available and store was cleared, 
-                // OR use the one from store if it matched.
-                const targetRoom = useGameStore.getState().roomId || joinId;
-                if (targetRoom) joinRoom(targetRoom, existing.name);
-            }
-        }
-
-        // Fix 1: Auto-Generate Card on Join if missing (for fresh joins)
-        // Wait check a bit to allow hydration
-        setTimeout(() => {
-            const playerState = useGameStore.getState().players.find(p => p.id === savedId);
-            if (playerState && playerState.card.length === 0) {
-                const newCard = generateCard();
-                updatePlayerCard(playerState.id, newCard);
-            }
-        }, 500);
-
-        return () => clearTimeout(stuckTimer);
-    }, [joinRoom, generateCard, updatePlayerCard]);
-
     const handleManualReset = () => {
-        // Immediate Nuclear Reset
         localStorage.clear();
         window.location.reload();
     };
@@ -80,10 +37,9 @@ export const PlayerDashboard = () => {
 
         joinRoom(joinId, playerName);
         const card = generateCard();
-
         setTimeout(() => {
             updatePlayerCard(newId, card);
-        }, 100);
+        }, 50);
 
         setHasJoined(true);
     };
@@ -96,7 +52,6 @@ export const PlayerDashboard = () => {
 
     const handleLock = () => {
         if (!myPlayer) return;
-        // Native confirm is fine, but let's make sure linter doesn't complain
         const confirmed = window.confirm("Lock this card? You won't be able to reroll.");
         if (confirmed) {
             lockMyCard(myPlayer.id);
@@ -114,7 +69,7 @@ export const PlayerDashboard = () => {
             : [...myPlayer.markedIndices, index];
 
         if (checkBingo(newMarked)) {
-            // Bingo logic handled by button
+            // Check logic
         }
     };
 
@@ -127,69 +82,84 @@ export const PlayerDashboard = () => {
         }));
     };
 
-    const [logs, setLogs] = useState<string[]>([]);
-
-    const addLog = (msg: string) => {
-        setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`].slice(-10));
-    };
-
-    // Override console for mobile debugging
+    // Persistence Check
     useEffect(() => {
-        const originalLog = console.log;
-        const originalError = console.error;
+        const params = new URLSearchParams(window.location.search);
+        const joinId = params.get('join');
+        useGameStore.getState().checkSessionMismatch(joinId);
 
-        console.log = (...args) => {
-            originalLog(...args);
-            addLog(args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
-        };
+        const stuckTimer = setTimeout(() => {
+            if (joinId && !useGameStore.getState().roomId) {
+                setIsStuck(true);
+            }
+        }, 2000);
 
-        console.error = (...args) => {
-            originalError(...args);
-            addLog(`ERROR: ${args.map(a => String(a)).join(' ')}`);
-        };
+        const storedPlayers = useGameStore.getState().players;
+        const savedId = localStorage.getItem('my_bingo_player_id');
 
-        return () => {
-            console.log = originalLog;
-            console.error = originalError;
-        };
-    }, []);
+        if (savedId) {
+            const existing = storedPlayers.find(p => p.id === savedId);
+            if (existing) {
+                setPlayerName(existing.name);
+                setHasJoined(true);
+                const targetRoom = useGameStore.getState().roomId || joinId;
+                if (targetRoom) joinRoom(targetRoom, existing.name);
+            }
+        }
+
+        return () => clearTimeout(stuckTimer);
+    }, [joinRoom]);
+
+    // FIX 1: AGGRESSIVE AUTO-GENETATE (Updated V3.1)
+    useEffect(() => {
+        const savedId = localStorage.getItem('my_bingo_player_id');
+        if (!savedId) return;
+
+        const currentState = useGameStore.getState();
+        const me = currentState.players.find(p => p.id === savedId);
+
+        // If connected + NO card -> FORCE GEN
+        if (me && (!me.card || me.card.length === 0)) {
+            console.log("⚡️ V3.1 FORCE GEN - FOUND EMPTY CARD");
+            const newCard = generateCard();
+            updatePlayerCard(savedId, newCard);
+        }
+    }, [players, generateCard, updatePlayerCard]);
+
+    // FIX 3: REACTIVE AUTO-MARK (V3.1)
+    useEffect(() => {
+        if (!currentNumber || !myPlayer) return;
+
+        const targetStr = currentNumber.toString();
+        const idx = myPlayer.card.findIndex(n => n.toString() === targetStr);
+
+        if (idx !== -1) {
+            if (!myPlayer.markedIndices.includes(idx)) {
+                console.log(`[AUTO-MARK] Index ${idx} Match. Marking...`);
+                handleMark(idx);
+                if (navigator.vibrate) navigator.vibrate(200);
+            }
+        }
+    }, [currentNumber, myPlayer]);
 
     if (hasJoined && !myPlayer) {
-        // Connecting View with Debugger
         return (
             <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4 bg-deep-gray p-4">
+                <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
+                    PLAYER V3.1 (FORCED)
+                </div>
                 <h2 className="text-xl font-bold text-neon-cyan animate-pulse">Connecting to Host...</h2>
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
-
                 {isStuck && (
                     <div className="flex flex-col items-center animate-fade-in mt-4">
                         <button
                             onClick={handleManualReset}
-                            className="px-8 py-3 bg-red-500/10 border-2 border-red-500 text-red-400 rounded-full font-bold hover:bg-red-500/20 active:scale-95 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                            className="px-8 py-3 bg-red-500/10 border-2 border-red-500 text-red-400 rounded-full font-bold"
                         >
                             Stuck? Tap to Retry
                         </button>
                     </div>
                 )}
-
-                {/* Mobile Debugger - BRUTE FORCE VISIBILITY */}
-                <div className="fixed bottom-0 left-0 w-full h-48 bg-black z-[9999] border-t-2 border-neon-magenta overflow-hidden flex flex-col font-mono text-[10px] text-green-400 p-2 shadow-[0_-5px_20px_rgba(0,0,0,0.8)]">
-                    <div className="flex justify-between items-center border-b border-gray-800 pb-1 mb-1">
-                        <span className="font-bold text-white">LIVE DEBUG LOG</span>
-                        <span className="text-gray-500">{logs.length} events</span>
-                    </div>
-                    <div className="flex-1 overflow-y-auto space-y-1">
-                        {logs.length === 0 && <div className="text-gray-600 italic">Waiting for logs...</div>}
-                        {logs.map((log, i) => (
-                            <div key={i} className="break-all border-b border-gray-900/50 pb-0.5">
-                                <span className="text-gray-500 mr-2">[{log.split(' - ')[0]}]</span>
-                                <span className={log.includes('ERROR') ? 'text-red-500 font-bold' : ''}>
-                                    {log.split(' - ').slice(1).join(' - ') || log}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
             </div>
         );
     }
@@ -197,6 +167,9 @@ export const PlayerDashboard = () => {
     if (!hasJoined) {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
+                <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
+                    PLAYER V3.1 (FORCED)
+                </div>
                 <div className="w-full max-w-sm bg-dark-surface p-6 rounded-xl border border-gray-800 shadow-2xl space-y-4">
                     <h1 className="text-3xl font-black text-center text-white italic">NEON<span className="text-neon-cyan">BINGO</span></h1>
                     <input
@@ -213,7 +186,7 @@ export const PlayerDashboard = () => {
                         JOIN GAME
                     </button>
                     <div className="text-xs text-center text-gray-500 mt-2">
-                        Build v2.1 (Anti-Cheat)
+                        Build v3.1 FORCED UPDATE
                     </div>
                 </div>
             </div>
@@ -222,13 +195,15 @@ export const PlayerDashboard = () => {
 
     const isBingo = checkBingo(myPlayer!.markedIndices);
 
-    // ... Rendering Main Dashboard ...
-
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
-            {/* ROLLING OVERLAY */}
+            <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
+                PLAYER V3.1 (FORCED UPDATE)
+            </div>
+
+            {/* SYNC OVERLAY */}
             {isRolling && (
-                <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center flex-col">
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center flex-col">
                     <div className="text-neon-cyan text-4xl font-black animate-bounce">ROLLING...</div>
                     <div className="text-white text-sm mt-2">Good Luck!</div>
                 </div>
@@ -241,8 +216,8 @@ export const PlayerDashboard = () => {
                     <span className="text-xs text-gray-400">{status} MODE</span>
                 </div>
                 <div className="text-right">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Draw</span>
-                    <div className="text-3xl font-black text-neon-magenta leading-none">{currentNumber || '--'}</div>
+                    <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Draw</span>
+                    <div className="text-4xl font-black text-neon-magenta leading-none">{currentNumber || '--'}</div>
                 </div>
             </div>
 
@@ -261,7 +236,6 @@ export const PlayerDashboard = () => {
                     onMark={handleMark}
                 />
 
-                {/* Lobby Controls */}
                 {status === 'LOBBY' ? (
                     !myPlayer!.isLocked ? (
                         <div className="flex gap-3 w-full max-w-sm">
@@ -290,7 +264,6 @@ export const PlayerDashboard = () => {
                 )}
             </div>
 
-            {/* Victory Button */}
             {isBingo && (
                 <div className="fixed bottom-8 left-0 w-full px-6 z-30">
                     <button
@@ -303,11 +276,6 @@ export const PlayerDashboard = () => {
             )}
 
             <div className="mt-8 opacity-50"><BrandFooter /></div>
-
-            {/* Inline Debugger for Connected State (optional, if issues persist) */}
-            <div className="mt-8 p-2 text-[10px] text-gray-600 font-mono text-center">
-                Room: {roomId} | Peer Status: {connectionStatus}
-            </div>
-        </div>
+        </div >
     );
 };

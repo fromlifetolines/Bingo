@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Play, RotateCcw, Users, Unlock } from 'lucide-react';
 import { usePeerConnection } from '../../hooks/usePeerConnection';
 import { useGameStore } from '../../store/gameStore';
@@ -8,36 +8,65 @@ import { QRCodeDisplay } from './QRCodeDisplay';
 import { RecentNumbers } from './RecentNumbers';
 import { BrandFooter } from '../shared/BrandFooter';
 
+// V3.1 REWRITE: FORCED UPDATE + ASYNC UI OPTIMIZATION
 export const HostDashboard = () => {
-    const { createRoom, hostDrawNumber, connectionStatus, startGame } = usePeerConnection();
-    const { roomId, currentNumber, drawnNumbers, players, status } = useGameStore();
+    const { createRoom, connectionStatus, startGame, broadcast } = usePeerConnection();
+    const { roomId, currentNumber, drawnNumbers, players, status, drawNumber: storeDrawNumber } = useGameStore();
     const { playPop, playHorn, announceNumber } = useSoundEffects();
+
+    const [isRolling, setIsRolling] = useState(false);
 
     useEffect(() => {
         if (!roomId) createRoom();
     }, [roomId, createRoom]);
 
     useEffect(() => {
-        if (currentNumber && status === 'PLAYING') {
-            // Delay announce to sync with slot animation finish (approx 3.0s)
-            setTimeout(() => {
-                playPop(); // This is the 'ting'
-                announceNumber(currentNumber);
-            }, 3000);
-        }
-    }, [currentNumber, status, playPop, announceNumber]);
-
-    // Bingo Horn
-    useEffect(() => {
         if (players.some(p => p.hasBingo)) playHorn();
     }, [players, playHorn]);
 
     const handleStartGame = () => {
-        startGame(); // Now strictly through PeerConnection hook to ensure broadcast
+        startGame();
+    };
+
+    const handleStrictDraw = () => {
+        if (isRolling) return;
+
+        // 1. UI UPDATE FIRST (Solves Lag)
+        setIsRolling(true);
+        // Play sound (assuming we rely on visual mostly or silent drum, prompt asked for playRollingSound but we don't have it imported, relying on UI state)
+
+        // 2. NETWORK NEXT (Non-blocking)
+        // Use requestAnimationFrame to ensure the UI paints the disabled state/rolling text BEFORE we do any network work
+        requestAnimationFrame(() => {
+            broadcast({ type: 'ROLLING' });
+            useGameStore.getState().setRolling(true);
+        });
+
+        // 3. LOGIC LAST (Delayed)
+        setTimeout(() => {
+            storeDrawNumber();
+            const newState = useGameStore.getState();
+            const newNum = newState.currentNumber;
+
+            setIsRolling(false);
+            useGameStore.getState().setRolling(false);
+            playPop();
+
+            // 4. REVEAL TO MOBILE
+            if (newNum) {
+                broadcast({ type: 'DRAW_NUMBER', payload: newNum });
+                announceNumber(newNum);
+            }
+        }, 3000);
     };
 
     return (
-        <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8">
+        <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
+            {/* DEBUG TAG V3.1 */}
+            <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
+                HOST V3.1 (FORCED UPDATE)
+            </div>
+
             {/* Sidebar */}
             <div className="col-span-3 space-y-8 border-r border-gray-800 pr-6 flex flex-col h-full">
                 <div>
@@ -104,22 +133,19 @@ export const HostDashboard = () => {
                         </button>
                     ) : (
                         <button
-                            onClick={hostDrawNumber}
-                            disabled={status !== 'PLAYING'}
-                            className="flex items-center gap-3 px-10 py-5 bg-neon-cyan text-black font-black text-2xl rounded-full hover:scale-105 active:scale-95 transition shadow-[0_0_30px_rgba(0,243,255,0.3)] disabled:opacity-50"
+                            onClick={handleStrictDraw}
+                            disabled={status !== 'PLAYING' || isRolling}
+                            className="flex items-center gap-3 px-10 py-5 bg-neon-cyan text-black font-black text-2xl rounded-full hover:scale-105 active:scale-95 transition-transform duration-100 shadow-[0_0_30px_rgba(0,243,255,0.3)] disabled:opacity-50"
                         >
-                            <Play fill="black" /> DRAW NUMBER
+                            <Play fill="black" /> {isRolling ? 'ROLLING...' : 'DRAW NUMBER'}
                         </button>
                     )}
 
                     <button
                         onClick={() => {
                             if (confirm("⚠️ START NEW GAME?\nThis will disconnect everyone and generate a new Room ID.")) {
-                                // 1. CLEAR MEMORY to prevent "Zombie ID" (reconnecting to old session)
                                 localStorage.clear();
                                 sessionStorage.clear();
-
-                                // 2. FORCE NAVIGATE TO ROOT (Strip all params)
                                 window.location.href = window.location.origin + window.location.pathname;
                             }
                         }}

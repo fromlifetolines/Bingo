@@ -56,11 +56,31 @@ export const usePeerConnection = () => {
 
             case 'DRAW_NUMBER':
                 if (role === 'PLAYER') {
+                    const drawnNum = data.payload;
                     useGameStore.setState((state) => ({
-                        drawnNumbers: [...state.drawnNumbers, data.payload],
-                        currentNumber: data.payload,
+                        drawnNumbers: [...state.drawnNumbers, drawnNum],
+                        currentNumber: drawnNum,
                         isRolling: false
                     }));
+
+                    // Fix 3 (Auto-Mark Fix): Type-Safe Logic
+                    const myId = localStorage.getItem('my_bingo_player_id');
+                    if (myId) {
+                        const state = useGameStore.getState();
+                        const me = state.players.find(p => p.id === myId);
+
+                        if (me) {
+                            // FORCE STRING COMPARISON to avoid Number vs String bugs
+                            const foundIndex = me.card.findIndex(n => n.toString() === drawnNum.toString());
+
+                            if (foundIndex !== -1) {
+                                // Auto-mark locally
+                                state.markNumber(myId, foundIndex);
+                                // Optional: trigger vibration if available (handled in component usually, but logic here is requested)
+                                if (navigator.vibrate) navigator.vibrate(50);
+                            }
+                        }
+                    }
                 }
                 break;
 
@@ -166,19 +186,30 @@ export const usePeerConnection = () => {
     };
 
     const hostDrawNumber = async () => {
-        if (useGameStore.getState().status !== 'PLAYING') return;
-
-        broadcast({ type: 'ROLLING' });
-        useGameStore.getState().setRolling(true);
-
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        storeDrawNumber();
         const state = useGameStore.getState();
-        if (state.currentNumber) {
-            broadcast({ type: 'DRAW_NUMBER', payload: state.currentNumber });
-        }
-        useGameStore.getState().setRolling(false);
+        if (state.status !== 'PLAYING') return;
+        if (state.isRolling) return; // Prevent double clicks
+
+        // 1. START ROLLING (Immediate)
+        state.setRolling(true);
+        // Play sound if possible? (Hook usage limitation in non-component, skipping direct sound call, relying on UI to react to isRolling)
+
+        // BROADCAST "ROLLING" STATE ONLY. DO NOT SEND THE NUMBER YET.
+        broadcast({ type: 'ROLLING' });
+
+        // 2. WAIT FOR ANIMATION (3 Seconds Hard Delay)
+        setTimeout(() => {
+            // 3. GENERATE & BROADCAST RESULT (Delayed)
+            storeDrawNumber(); // This generates the number in store
+            const newState = useGameStore.getState();
+            // We need to stop rolling
+            state.setRolling(false);
+
+            // Broadcast the ACTUAL number now
+            if (newState.currentNumber) {
+                broadcast({ type: 'DRAW_NUMBER', payload: newState.currentNumber });
+            }
+        }, 3000); // 3000ms delay
     };
 
     const startGame = () => {
