@@ -103,8 +103,8 @@ export const HostDashboard = () => {
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
-            <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V5.2 (TURBO)
+            <div className="fixed top-0 left-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
+                HOST V5.4 (SCROLLABLE)
             </div>
 
             {/* Sidebar */}
@@ -130,7 +130,7 @@ export const HostDashboard = () => {
                     </div>
                 )}
 
-                <div className="p-4 bg-dark-surface rounded-lg border border-gray-800 flex-1 overflow-hidden flex flex-col">
+                <div className="p-4 bg-dark-surface rounded-lg border border-gray-800 flex-1 overflow-hidden flex flex-col min-h-0">
                     <div className="flex items-center gap-2 mb-4 text-neon-magenta flex-shrink-0">
                         <Users size={20} />
                         <span className="font-bold">PLAYERS ({players.length})</span>
@@ -138,13 +138,17 @@ export const HostDashboard = () => {
                             {players.filter(p => p.isLocked).length} READY
                         </span>
                     </div>
-                    <ul className="space-y-2 overflow-y-auto flex-1 h-0">
+                    {/* V5.4 SCROLLABLE FIX: max-h container with overflow */}
+                    <ul className="space-y-2 overflow-y-auto flex-1 pr-2 custom-scrollbar">
                         {players.map(p => (
                             <li key={p.id} className="text-sm text-gray-300 border-b border-gray-800 pb-1 flex justify-between">
                                 <span>{p.name}</span>
                                 {p.hasBingo && <span className="text-yellow-400 animate-pulse">🏆 BINGO!</span>}
                             </li>
                         ))}
+                        {players.length === 0 && (
+                            <li className="text-gray-500 text-center italic mt-10">Waiting for players...</li>
+                        )}
                     </ul>
                 </div>
 
