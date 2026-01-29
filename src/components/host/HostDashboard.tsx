@@ -8,7 +8,7 @@ import { QRCodeDisplay } from './QRCodeDisplay';
 import { RecentNumbers } from './RecentNumbers';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.2 LOCAL FIRST REWRITE
+// V3.3 FAIL-SAFE: REMOVED LOCKS + TRY/CATCH
 export const HostDashboard = () => {
     const { createRoom, connectionStatus, startGame, broadcast } = usePeerConnection();
     const { roomId, currentNumber, drawnNumbers, players, status, drawNumber: storeDrawNumber } = useGameStore();
@@ -29,41 +29,51 @@ export const HostDashboard = () => {
     };
 
     const handleStrictDraw = () => {
-        if (isRolling) return;
+        // FAIL-SAFE: ALLOW CLICKING EVEN IF "ROLLING" (To unstick)
+        // if (isRolling) return; <-- REMOVED LOCK
+
+        console.log("⚡️ V3.3 MANUAL DRAW TRIGGER");
 
         // 1. VISUAL & STATE
         setIsRolling(true);
-        useGameStore.getState().setRolling(true); // Sync local store immediately
+        useGameStore.getState().setRolling(true);
 
-        // 2. BROADCAST ROLLING (Immediate)
-        // We broadcast immediately to clear player screens
+        // 2. BROADCAST ROLLING 
         broadcast({ type: 'ROLLING' });
 
-        // 3. WAIT (Reduced to 2500ms for responsiveness)
+        // 3. WAIT 
         setTimeout(() => {
-            // 4. GENERATE
-            storeDrawNumber();
-            const newState = useGameStore.getState();
-            const newNum = newState.currentNumber;
+            try {
+                // 4. GENERATE
+                storeDrawNumber();
+                const newState = useGameStore.getState();
+                const newNum = newState.currentNumber;
 
-            // 5. UPDATE LOCAL
-            setIsRolling(false);
-            useGameStore.getState().setRolling(false);
-            playPop();
+                // 5. UPDATE LOCAL
+                setIsRolling(false);
+                useGameStore.getState().setRolling(false);
+                playPop();
 
-            // 6. BROADCAST RESULT
-            if (newNum) {
-                broadcast({ type: 'DRAW_NUMBER', payload: newNum });
-                announceNumber(newNum);
+                // 6. BROADCAST RESULT
+                if (newNum) {
+                    broadcast({ type: 'DRAW_NUMBER', payload: newNum });
+                    announceNumber(newNum);
+                }
+            } catch (e) {
+                console.error("❌ DRAW FAILED:", e);
+                // Force reset on error
+                setIsRolling(false);
+                useGameStore.getState().setRolling(false);
+                alert("Draw failed. Please click again.");
             }
         }, 2500);
     };
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
-            {/* DEBUG TAG V3.2 */}
+            {/* DEBUG TAG V3.3 */}
             <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V3.2 (LOCAL)
+                HOST V3.3 (UNLOCKED)
             </div>
 
             {/* Sidebar */}
@@ -133,7 +143,9 @@ export const HostDashboard = () => {
                     ) : (
                         <button
                             onClick={handleStrictDraw}
-                            disabled={status !== 'PLAYING' || isRolling}
+                            // UNLOCKED: DISABLED REMOVED so user can spam if stuck
+                            // disabled={status !== 'PLAYING' || isRolling} 
+                            disabled={status !== 'PLAYING'}
                             className="flex items-center gap-3 px-10 py-5 bg-neon-cyan text-black font-black text-2xl rounded-full hover:scale-105 active:scale-95 transition-transform duration-100 shadow-[0_0_30px_rgba(0,243,255,0.3)] disabled:opacity-50"
                         >
                             <Play fill="black" /> {isRolling ? 'ROLLING...' : 'DRAW NUMBER'}

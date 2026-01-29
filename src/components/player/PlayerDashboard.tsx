@@ -8,7 +8,7 @@ import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.2 LOCAL FIRST REWRITE
+// V3.3 FAIL-SAFE: MANUAL FALLBACK FOR BLANK SCREENS
 export const PlayerDashboard = () => {
     const { joinRoom, connectionStatus, lockMyCard } = usePeerConnection();
     const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard, isRolling } = useGameStore();
@@ -57,9 +57,7 @@ export const PlayerDashboard = () => {
     };
 
     const handleMark = (index: number) => {
-        if (!myPlayer || status !== 'PLAYING') return; // Strict status check? User just said 'local first'
-        // We allow marking if number matches, regardless of strict status play
-        // But store usually enforces status. We follow store.
+        if (!myPlayer || status !== 'PLAYING') return;
 
         const store = useGameStore.getState();
         store.markNumber(myPlayer.id, index);
@@ -80,7 +78,6 @@ export const PlayerDashboard = () => {
         }));
     };
 
-    // Persistence Check
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const joinId = params.get('join');
@@ -108,43 +105,20 @@ export const PlayerDashboard = () => {
         return () => clearTimeout(stuckTimer);
     }, [joinRoom]);
 
-    // FIX 1: BRUTE FORCE AUTO-GEN (V3.2)
-    // Runs once on mount, checks local state/store immediately.
-    useEffect(() => {
-        const savedId = localStorage.getItem('my_bingo_player_id') || 'temp-id'; // Fallback if brand new
-        // We can't really generate for 'temp-id' effectively if we haven't joined, 
-        // but if we are here (mounted), and maybe restoring...
-
-        const state = useGameStore.getState();
-        const me = state.players.find(p => p.id === savedId);
-
-        if (me && (!me.card || me.card.length === 0)) {
-            console.log("⚡️ V3.2 LOCAL GEN - Brute forcing card");
-            const newCard = generateCard();
-            updatePlayerCard(savedId, newCard);
-        }
-    }, []);
-
-    // FIX 2: SYNC & AUTO-MARK (V3.2)
-    // Directly subscribe to currentNumber changes
     useEffect(() => {
         if (currentNumber) {
-            setLocalRolling(false); // Stop rolling immediately on receipt
-
-            // Auto-Mark Logic
+            setLocalRolling(false);
             if (myPlayer) {
                 const strNum = currentNumber.toString();
                 const idx = myPlayer.card.findIndex(n => n.toString() === strNum);
                 if (idx !== -1 && !myPlayer.markedIndices.includes(idx)) {
-                    console.log(`[AUTO-MARK] V3.2 Match ${strNum} at ${idx}`);
                     handleMark(idx);
                     if (navigator.vibrate) navigator.vibrate(200);
                 }
             }
         }
-    }, [currentNumber, myPlayer]); // React to number updates
+    }, [currentNumber, myPlayer]);
 
-    // Fix Rolling State from Store (or peer event)
     useEffect(() => {
         if (isRolling) setLocalRolling(true);
         else setLocalRolling(false);
@@ -154,8 +128,8 @@ export const PlayerDashboard = () => {
     if (hasJoined && !myPlayer) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4 bg-deep-gray p-4">
-                <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.2 (LOCAL)
+                <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold border-2 border-white">
+                    PLAYER V3.3 (FAIL-SAFE)
                 </div>
                 <h2 className="text-xl font-bold text-neon-cyan animate-pulse">Connecting to Host...</h2>
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
@@ -173,8 +147,8 @@ export const PlayerDashboard = () => {
     if (!hasJoined) {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
-                <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.2 (LOCAL)
+                <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold border-2 border-white">
+                    PLAYER V3.3 (FAIL-SAFE)
                 </div>
                 <div className="w-full max-w-sm bg-dark-surface p-6 rounded-xl border border-gray-800 shadow-2xl space-y-4">
                     <h1 className="text-3xl font-black text-center text-white italic">NEON<span className="text-neon-cyan">BINGO</span></h1>
@@ -196,15 +170,37 @@ export const PlayerDashboard = () => {
         )
     }
 
+    // FAIL-SAFE MANUAL BUTTON (Replacing Blank Screen)
+    if (!myPlayer.card || myPlayer.card.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-8">
+                <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.3 (FAIL-SAFE)</div>
+                <h1 className="text-3xl font-bold mb-8 text-center text-red-400">Card Not Found?</h1>
+                <p className="mb-8 text-center text-gray-400">If your screen is blank, click below to force a new card.</p>
+                <button
+                    onClick={() => {
+                        console.log("⚡️ V3.3 MANUAL CARD GENERATION");
+                        const newCard = generateCard();
+                        // Update store directly using player ID
+                        updatePlayerCard(myPlayer.id, newCard);
+                        // Force UI refresh if needed (usually store update triggers it)
+                    }}
+                    className="bg-neon-magenta hover:bg-neon-cyan text-white text-2xl font-black px-8 py-6 rounded-xl shadow-[0_0_20px_rgba(255,0,255,0.5)] border-2 border-white animate-bounce active:scale-95 transition-all"
+                >
+                    CLICK TO GET CARD
+                </button>
+            </div>
+        );
+    }
+
     const isBingo = checkBingo(myPlayer!.markedIndices);
 
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
-            <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V3.2 (LOCAL)
+            <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
+                PLAYER V3.3 (FAIL-SAFE)
             </div>
 
-            {/* SYNC OVERLAY */}
             {(localRolling || isRolling) && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center flex-col">
                     <div className="text-neon-cyan text-4xl font-black animate-bounce">ROLLING...</div>
@@ -212,7 +208,6 @@ export const PlayerDashboard = () => {
                 </div>
             )}
 
-            {/* Header */}
             <div className="sticky top-0 bg-dark-surface/90 backdrop-blur border-b border-gray-800 p-4 z-20 flex justify-between items-center">
                 <div>
                     <h2 className="font-bold text-neon-cyan">{myPlayer!.name}</h2>
@@ -224,14 +219,12 @@ export const PlayerDashboard = () => {
                 </div>
             </div>
 
-            {/* Status Bar */}
             {status === 'LOBBY' && (
                 <div className="bg-yellow-500/10 p-2 text-center text-yellow-500 text-xs font-bold border-b border-yellow-500/20">
                     {myPlayer!.isLocked ? "READY TO START" : "FINALIZE YOUR CARD"}
                 </div>
             )}
 
-            {/* Card Area */}
             <div className="p-4 flex flex-col items-center gap-6 mt-4">
                 <BingoCard
                     numbers={myPlayer!.card}
