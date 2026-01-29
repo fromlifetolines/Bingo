@@ -26,13 +26,12 @@ export const PlayerDashboard = () => {
         // Check for mismatch BEFORE trying to restore
         useGameStore.getState().checkSessionMismatch(joinId);
 
-        // Stuck Timer
+        // Stuck Timer: Show retry button quickly (2s) if connection hangs
         const stuckTimer = setTimeout(() => {
-            // If we have a join ID but no roomId in store (meaning we haven't connected yet)
             if (joinId && !useGameStore.getState().roomId) {
                 setIsStuck(true);
             }
-        }, 5000);
+        }, 2000);
 
         const storedPlayers = useGameStore.getState().players;
         const savedId = localStorage.getItem('my_bingo_player_id');
@@ -52,10 +51,9 @@ export const PlayerDashboard = () => {
     }, [joinRoom]);
 
     const handleManualReset = () => {
-        if (window.confirm("This will clear your local data and reload. OK?")) {
-            localStorage.clear();
-            window.location.reload();
-        }
+        // Immediate Nuclear Reset
+        localStorage.clear();
+        window.location.reload();
     };
 
     const myPlayer = players.find(p => p.name === playerName);
@@ -146,17 +144,20 @@ export const PlayerDashboard = () => {
 
     if (!myPlayer) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4">
+            <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4 bg-deep-gray">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
-                <div className="text-gray-400">Connecting to Game...</div>
+                <div className="text-gray-400 font-medium">Connecting to Game...</div>
 
                 {isStuck && (
-                    <button
-                        onClick={handleManualReset}
-                        className="mt-4 px-6 py-2 bg-red-500/10 border border-red-500 text-red-400 rounded-full text-sm hover:bg-red-500/20 transition"
-                    >
-                        Stuck? Click to Reset
-                    </button>
+                    <div className="flex flex-col items-center animate-fade-in mt-4">
+                        <button
+                            onClick={handleManualReset}
+                            className="px-8 py-3 bg-red-500/10 border-2 border-red-500 text-red-400 rounded-full font-bold hover:bg-red-500/20 active:scale-95 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                        >
+                            Stuck? Tap to Retry
+                        </button>
+                        <p className="text-xs text-gray-600 mt-2">Force Reconnect</p>
+                    </div>
                 )}
             </div>
         );
