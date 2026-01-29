@@ -110,17 +110,31 @@ export const usePeerConnection = () => {
 
     // PLAYER: Join Room
     const joinRoom = (hostId: string, playerName: string) => {
-        if (peerRef.current) return;
+        // Safe refresh: if peer exists, it might be in an old state. Destroy it.
+        if (peerRef.current) {
+            console.log('Destroying old peer before joining new room...');
+            peerRef.current.destroy();
+            peerRef.current = null;
+        }
 
         setConnectionStatus('CONNECTING');
         const peer = new Peer();
         peerRef.current = peer;
 
         peer.on('open', (id) => {
-            const conn = peer.connect(hostId);
-            connectionsRef.current = [conn]; // Player only has one connection (to Host)
+            console.log('My Player ID:', id);
+            console.log(`Attempting to connect to Host: ${hostId}`);
+
+            // Connect with reliable serialization
+            const conn = peer.connect(hostId, {
+                serialization: 'json',
+                reliable: true
+            });
+
+            connectionsRef.current = [conn];
 
             conn.on('open', () => {
+                console.log('✅ Connection to Host OPEN!');
                 setConnectionStatus('CONNECTED');
                 setRoomId(hostId);
                 // Send join event
@@ -137,6 +151,17 @@ export const usePeerConnection = () => {
                 console.error('Connection Error:', err);
                 setConnectionStatus('DISCONNECTED');
             });
+
+            conn.on('close', () => {
+                console.warn('Connection to Host CLOSED.');
+                setConnectionStatus('DISCONNECTED');
+            });
+        });
+
+        peer.on('error', (err) => {
+            console.error('Peer Fatal Error:', err);
+            // If ID is taken (rare with random) or network fails
+            setConnectionStatus('DISCONNECTED');
         });
     };
 

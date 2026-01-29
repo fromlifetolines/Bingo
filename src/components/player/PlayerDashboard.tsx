@@ -116,6 +116,62 @@ export const PlayerDashboard = () => {
         }));
     };
 
+    const [logs, setLogs] = useState<string[]>([]);
+
+    const addLog = (msg: string) => {
+        setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`].slice(-10));
+    };
+
+    // Override console for mobile debugging
+    useEffect(() => {
+        const originalLog = console.log;
+        const originalError = console.error;
+
+        console.log = (...args) => {
+            originalLog(...args);
+            addLog(args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
+        };
+
+        console.error = (...args) => {
+            originalError(...args);
+            addLog(`ERROR: ${args.map(a => String(a)).join(' ')}`);
+        };
+
+        return () => {
+            console.log = originalLog;
+            console.error = originalError;
+        };
+    }, []);
+
+    if (hasJoined && !myPlayer) {
+        // Connecting View with Debugger
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4 bg-deep-gray p-4">
+                <h2 className="text-xl font-bold text-neon-cyan animate-pulse">Connecting to Host...</h2>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
+
+                {isStuck && (
+                    <div className="flex flex-col items-center animate-fade-in mt-4">
+                        <button
+                            onClick={handleManualReset}
+                            className="px-8 py-3 bg-red-500/10 border-2 border-red-500 text-red-400 rounded-full font-bold hover:bg-red-500/20 active:scale-95 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                        >
+                            Stuck? Tap to Retry
+                        </button>
+                    </div>
+                )}
+
+                {/* Mobile Debugger */}
+                <div className="w-full max-w-sm mt-8 p-2 bg-black/50 rounded text-[10px] font-mono h-32 overflow-y-auto border border-gray-800 text-gray-400">
+                    <div className="sticky top-0 bg-black/80 text-white font-bold px-1 border-b border-gray-700">DEBUG LOG</div>
+                    {logs.map((log, i) => (
+                        <div key={i} className="border-b border-gray-800/50 py-0.5">{log}</div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
     if (!hasJoined) {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
@@ -142,28 +198,9 @@ export const PlayerDashboard = () => {
         )
     }
 
-    if (!myPlayer) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4 bg-deep-gray">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
-                <div className="text-gray-400 font-medium">Connecting to Game...</div>
+    const isBingo = checkBingo(myPlayer!.markedIndices);
 
-                {isStuck && (
-                    <div className="flex flex-col items-center animate-fade-in mt-4">
-                        <button
-                            onClick={handleManualReset}
-                            className="px-8 py-3 bg-red-500/10 border-2 border-red-500 text-red-400 rounded-full font-bold hover:bg-red-500/20 active:scale-95 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                        >
-                            Stuck? Tap to Retry
-                        </button>
-                        <p className="text-xs text-gray-600 mt-2">Force Reconnect</p>
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    const isBingo = checkBingo(myPlayer.markedIndices);
+    // ... Rendering Main Dashboard ...
 
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
@@ -178,7 +215,7 @@ export const PlayerDashboard = () => {
             {/* Header */}
             <div className="sticky top-0 bg-dark-surface/90 backdrop-blur border-b border-gray-800 p-4 z-20 flex justify-between items-center">
                 <div>
-                    <h2 className="font-bold text-neon-cyan">{myPlayer.name}</h2>
+                    <h2 className="font-bold text-neon-cyan">{myPlayer!.name}</h2>
                     <span className="text-xs text-gray-400">{status} MODE</span>
                 </div>
                 <div className="text-right">
@@ -190,21 +227,21 @@ export const PlayerDashboard = () => {
             {/* Status Bar */}
             {status === 'LOBBY' && (
                 <div className="bg-yellow-500/10 p-2 text-center text-yellow-500 text-xs font-bold border-b border-yellow-500/20">
-                    {myPlayer.isLocked ? "READY TO START" : "FINALIZE YOUR CARD"}
+                    {myPlayer!.isLocked ? "READY TO START" : "FINALIZE YOUR CARD"}
                 </div>
             )}
 
             {/* Card Area */}
             <div className="p-4 flex flex-col items-center gap-6 mt-4">
                 <BingoCard
-                    numbers={myPlayer.card}
-                    markedIndices={myPlayer.markedIndices}
+                    numbers={myPlayer!.card}
+                    markedIndices={myPlayer!.markedIndices}
                     onMark={handleMark}
                 />
 
                 {/* Lobby Controls */}
                 {status === 'LOBBY' ? (
-                    !myPlayer.isLocked ? (
+                    !myPlayer!.isLocked ? (
                         <div className="flex gap-3 w-full max-w-sm">
                             <button
                                 onClick={handleReroll}
@@ -244,6 +281,11 @@ export const PlayerDashboard = () => {
             )}
 
             <div className="mt-8 opacity-50"><BrandFooter /></div>
+
+            {/* Inline Debugger for Connected State (optional, if issues persist) */}
+            <div className="mt-8 p-2 text-[10px] text-gray-600 font-mono text-center">
+                Room: {roomId} | Peer Status: {connectionStatus}
+            </div>
         </div>
     );
 };

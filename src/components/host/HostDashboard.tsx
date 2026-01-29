@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Play, RotateCcw, Users, Lock, Unlock } from 'lucide-react';
+import { Play, RotateCcw, Users, Unlock } from 'lucide-react';
 import { usePeerConnection } from '../../hooks/usePeerConnection';
 import { useGameStore } from '../../store/gameStore';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
@@ -9,7 +9,7 @@ import { RecentNumbers } from './RecentNumbers';
 import { BrandFooter } from '../shared/BrandFooter';
 
 export const HostDashboard = () => {
-    const { createRoom, hostDrawNumber, reset, connectionStatus } = usePeerConnection();
+    const { createRoom, hostDrawNumber, connectionStatus } = usePeerConnection();
     const { roomId, currentNumber, drawnNumbers, players, status, startGame } = useGameStore();
     const { playPop, playHorn, announceNumber } = useSoundEffects();
 
@@ -122,7 +122,12 @@ export const HostDashboard = () => {
                     )}
 
                     <button
-                        onClick={() => { if (confirm("Reset game?")) reset(); }}
+                        onClick={() => {
+                            if (confirm("START A NEW GAME?\n\nThis will disconnect all players and generate a NEW Room ID.")) {
+                                // Hard Reload to generate fresh Peer ID
+                                window.location.href = window.location.pathname;
+                            }
+                        }}
                         className="flex items-center gap-2 px-6 py-3 border border-red-500 text-red-500 rounded-lg hover:bg-red-500/10 transition"
                     >
                         <RotateCcw size={18} /> RESET
