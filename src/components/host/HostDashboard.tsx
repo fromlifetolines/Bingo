@@ -6,7 +6,7 @@ import { QRCodeDisplay } from './QRCodeDisplay';
 import { RecentNumbers } from './RecentNumbers';
 import { LotteryDrum } from './LotteryDrum';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
-import FluidCanvas, { type FluidCanvasRef } from '../effects/FluidCanvas';
+// import FluidCanvas, { type FluidCanvasRef } from '../effects/FluidCanvas';
 import { BrandFooter } from '../shared/BrandFooter';
 
 // V4.1 STABLE: GLOBAL STORE ACCESS (Anti-Closure Fix)

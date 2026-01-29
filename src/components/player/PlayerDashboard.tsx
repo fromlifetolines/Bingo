@@ -7,7 +7,7 @@ import { useBingoLogic } from '../../hooks/useBingoLogic';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
-import FluidCanvas, { FluidCanvasRef } from '../effects/FluidCanvas';
+// import FluidCanvas, { FluidCanvasRef } from '../effects/FluidCanvas';
 
 // V4.0 SYNC: ANIMATION AWARE
 export const PlayerDashboard = () => {
