@@ -8,7 +8,7 @@ import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.6 OFFLINE UI: NON-BLOCKING & IMMEDIATE RENDER
+// V3.7 FORCE SWAP: LOCAL STATE CONTROLS VIEW
 export const PlayerDashboard = () => {
     const { joinRoom, connectionStatus, lockMyCard } = usePeerConnection();
     const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard, isRolling } = useGameStore();
@@ -19,23 +19,32 @@ export const PlayerDashboard = () => {
     const [hasJoined, setHasJoined] = useState(false);
     const [localRolling, setLocalRolling] = useState(false);
 
+    // V3.7 NEW: LOCAL FORCE STATE
+    const [hasCardLocal, setHasCardLocal] = useState(false);
+
     // Fallback ID from local storage
     const savedId = localStorage.getItem('my_bingo_player_id');
 
     // Resolve Player Object: Store > Local Fallback > Null
-    // This prevents the "Blocker" waiting for store sync
     const storePlayer = players.find(p => p.id === savedId);
 
-    // Construct a temporary player object so UI can render immediately
+    // Construct local player object if store is missing it (Offline Support)
     const myPlayer = storePlayer || (hasJoined && savedId ? {
         id: savedId,
         name: playerName,
-        card: [],
+        card: [], // This might be empty initially
         markedIndices: [],
         isLocked: false,
         hasBingo: false,
         joinedAt: Date.now()
     } : undefined);
+
+    // V3.7 Sync Effect: If store updates, update local state too
+    useEffect(() => {
+        if (myPlayer?.card && myPlayer.card.length > 0) {
+            setHasCardLocal(true);
+        }
+    }, [myPlayer]);
 
     const handleManualReset = () => {
         localStorage.clear();
@@ -53,18 +62,26 @@ export const PlayerDashboard = () => {
 
         joinRoom(joinId, playerName);
 
-        // Immediate local store init (Critical for offline feel)
+        // Immediate local store init
         const card = generateCard();
         updatePlayerCard(newId, card);
 
         setHasJoined(true);
+        setHasCardLocal(true); // V3.7: Assume success immediately
     };
 
     const handleManualGen = () => {
-        console.log("⚡️ V3.6 MANUAL TRIGGER");
+        console.log("⚡️ V3.7 MANUAL TRIGGER");
         const newCard = generateCard();
-        if (myPlayer?.id) {
-            updatePlayerCard(myPlayer.id, newCard);
+
+        const targetId = myPlayer?.id || localStorage.getItem('my_bingo_player_id');
+
+        if (targetId) {
+            updatePlayerCard(targetId, newCard);
+            // V3.7 CRITICAL FIX: Force View Swap Immediately
+            setHasCardLocal(true);
+        } else {
+            alert("Error: No Player ID found. Please reload.");
         }
     }
 
@@ -83,7 +100,6 @@ export const PlayerDashboard = () => {
 
     const handleMark = (index: number) => {
         if (!myPlayer) return;
-        // Allow marking offline
         const store = useGameStore.getState();
         store.markNumber(myPlayer.id, index);
         const newMarked = myPlayer.markedIndices.includes(index)
@@ -142,7 +158,7 @@ export const PlayerDashboard = () => {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
                 <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.6 (OFFLINE UI)
+                    PLAYER V3.7 (FORCE SWAP)
                 </div>
                 <div className="w-full max-w-sm bg-dark-surface p-6 rounded-xl border border-gray-800 shadow-2xl space-y-4">
                     <h1 className="text-3xl font-black text-center text-white italic">NEON<span className="text-neon-cyan">BINGO</span></h1>
@@ -164,14 +180,19 @@ export const PlayerDashboard = () => {
         )
     }
 
-    // VIEW: DASHBOARD (Rendered immediately after join)
-    // BLOCKER REMOVED: context now allows rendering even if "connecting..."
+    // VIEW CHECK: Do we have a card? (Check Local Force OR Store Data)
+    // If we have a local force, we assume the card exists in memory/store thanks to the handleManualGen
+    // Need to supply card numbers. If store doesn't have them yet but we forced locally, 
+    // we might render an empty grid if we aren't careful.
+    // However, calling generateCard() usually returns the array.
+    // Let's rely on store update being fast enough for the data, but the local flag for the VIEW SWAP.
 
-    // FAIL-SAFE MANUAL BUTTON (Prioritized if no card)
-    if (!myPlayer?.card || myPlayer.card.length === 0) {
+    const showGame = hasCardLocal || (myPlayer?.card && myPlayer.card.length > 0);
+
+    if (!showGame) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-8">
-                <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.6 (OFFLINE UI)</div>
+                <div className="fixed top-0 right-0 bg-orange-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.7 (WELCOME)</div>
                 {/* Connection Status Indicator */}
                 <div className="absolute top-4 left-4 flex items-center gap-2">
                     <div className={`w-3 h-3 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
@@ -192,12 +213,14 @@ export const PlayerDashboard = () => {
         );
     }
 
-    const isBingo = checkBingo(myPlayer!.markedIndices);
+    const isBingo = checkBingo(myPlayer?.markedIndices || []);
+    // If we forced swap but store is slow, card might be empty. Handle graceful fallback or just show empty grid.
+    const displayCard = (myPlayer?.card && myPlayer.card.length > 0) ? myPlayer.card : Array(25).fill(0);
 
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
-            <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V3.6 (OFFLINE UI)
+            <div className="fixed top-0 right-0 bg-green-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
+                PLAYER V3.7 (GAME)
             </div>
 
             {/* Connection Status Indicator */}
@@ -214,7 +237,7 @@ export const PlayerDashboard = () => {
 
             <div className="sticky top-0 bg-dark-surface/90 backdrop-blur border-b border-gray-800 p-4 z-20 flex justify-between items-center">
                 <div>
-                    <h2 className="font-bold text-neon-cyan">{myPlayer!.name}</h2>
+                    <h2 className="font-bold text-neon-cyan">{myPlayer?.name || playerName}</h2>
                     <span className="text-xs text-gray-400">{status} MODE</span>
                 </div>
                 <div className="text-right">
@@ -225,19 +248,19 @@ export const PlayerDashboard = () => {
 
             {status === 'LOBBY' && (
                 <div className="bg-yellow-500/10 p-2 text-center text-yellow-500 text-xs font-bold border-b border-yellow-500/20">
-                    {myPlayer!.isLocked ? "READY TO START" : "FINALIZE YOUR CARD"}
+                    {myPlayer?.isLocked ? "READY TO START" : "FINALIZE YOUR CARD"}
                 </div>
             )}
 
             <div className="p-4 flex flex-col items-center gap-6 mt-4">
                 <BingoCard
-                    numbers={myPlayer!.card}
-                    markedIndices={myPlayer!.markedIndices}
+                    numbers={displayCard}
+                    markedIndices={myPlayer?.markedIndices || []}
                     onMark={handleMark}
                 />
 
                 {status === 'LOBBY' ? (
-                    !myPlayer!.isLocked ? (
+                    !myPlayer?.isLocked ? (
                         <div className="flex gap-3 w-full max-w-sm">
                             <button
                                 onClick={handleReroll}

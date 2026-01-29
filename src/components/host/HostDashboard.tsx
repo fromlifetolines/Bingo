@@ -8,7 +8,7 @@ import { QRCodeDisplay } from './QRCodeDisplay';
 import { RecentNumbers } from './RecentNumbers';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.6 STABLE: UNLOCKED + MANUAL SAFETY MODE
+// V3.7 STABLE: UNLOCKED + MANUAL SAFETY MODE
 export const HostDashboard = () => {
     const { createRoom, connectionStatus, startGame, broadcast } = usePeerConnection();
     const { roomId, currentNumber, drawnNumbers, players, status, drawNumber: storeDrawNumber } = useGameStore();
@@ -29,7 +29,7 @@ export const HostDashboard = () => {
     };
 
     const handleStrictDraw = () => {
-        console.log("⚡️ V3.6 DRAW TRIGGER");
+        console.log("⚡️ V3.7 DRAW TRIGGER");
 
         // 1. FORCE RESET STATE 
         setIsRolling(false);
@@ -69,9 +69,9 @@ export const HostDashboard = () => {
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
-            {/* DEBUG TAG V3.6 */}
+            {/* DEBUG TAG V3.7 */}
             <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V3.6 (STABLE)
+                HOST V3.7 (STABLE)
             </div>
 
             {/* Sidebar */}
