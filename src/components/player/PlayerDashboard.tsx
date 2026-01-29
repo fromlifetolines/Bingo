@@ -161,12 +161,23 @@ export const PlayerDashboard = () => {
                     </div>
                 )}
 
-                {/* Mobile Debugger */}
-                <div className="w-full max-w-sm mt-8 p-2 bg-black/50 rounded text-[10px] font-mono h-32 overflow-y-auto border border-gray-800 text-gray-400">
-                    <div className="sticky top-0 bg-black/80 text-white font-bold px-1 border-b border-gray-700">DEBUG LOG</div>
-                    {logs.map((log, i) => (
-                        <div key={i} className="border-b border-gray-800/50 py-0.5">{log}</div>
-                    ))}
+                {/* Mobile Debugger - BRUTE FORCE VISIBILITY */}
+                <div className="fixed bottom-0 left-0 w-full h-48 bg-black z-[9999] border-t-2 border-neon-magenta overflow-hidden flex flex-col font-mono text-[10px] text-green-400 p-2 shadow-[0_-5px_20px_rgba(0,0,0,0.8)]">
+                    <div className="flex justify-between items-center border-b border-gray-800 pb-1 mb-1">
+                        <span className="font-bold text-white">LIVE DEBUG LOG</span>
+                        <span className="text-gray-500">{logs.length} events</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto space-y-1">
+                        {logs.length === 0 && <div className="text-gray-600 italic">Waiting for logs...</div>}
+                        {logs.map((log, i) => (
+                            <div key={i} className="break-all border-b border-gray-900/50 pb-0.5">
+                                <span className="text-gray-500 mr-2">[{log.split(' - ')[0]}]</span>
+                                <span className={log.includes('ERROR') ? 'text-red-500 font-bold' : ''}>
+                                    {log.split(' - ').slice(1).join(' - ') || log}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         );

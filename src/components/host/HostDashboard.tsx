@@ -123,9 +123,10 @@ export const HostDashboard = () => {
 
                     <button
                         onClick={() => {
-                            if (confirm("START A NEW GAME?\n\nThis will disconnect all players and generate a NEW Room ID.")) {
-                                // Hard Reload to generate fresh Peer ID
-                                window.location.href = window.location.pathname;
+                            if (confirm("START NEW GAME?")) {
+                                // BRUTE FORCE RESET: Reloads page without query params
+                                // This GUARANTEES a completely fresh Peer ID and Room ID
+                                window.location.href = window.location.origin + window.location.pathname;
                             }
                         }}
                         className="flex items-center gap-2 px-6 py-3 border border-red-500 text-red-500 rounded-lg hover:bg-red-500/10 transition"
