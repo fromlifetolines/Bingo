@@ -5,9 +5,9 @@ interface Props {
 }
 
 export const QRCodeDisplay = ({ roomId }: Props) => {
-    // Construct the join URL. Assuming hash router or similar for simplicity, 
-    // or just query param ?join=ROOM_ID
-    const joinUrl = `${window.location.origin}?join=${roomId}`;
+    // Correctly construct URL using current full path (Handles /Bingo/ subpath on GitHub Pages)
+    // Uses window.location.href to capture protocol, domain, and path, then appends query param
+    const joinUrl = `${window.location.href.split('?')[0]}?join=${roomId}`;
 
     return (
         <div className="flex flex-col items-center gap-4 p-6 bg-dark-surface rounded-xl border border-neon-cyan/30 shadow-[0_0_15px_rgba(0,243,255,0.2)]">
