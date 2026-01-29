@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
 
 interface Props {
@@ -14,7 +14,15 @@ const BALL_COLORS = {
     O: 'border-purple-400 text-purple-400 shadow-[0_0_20px_rgba(192,132,252,0.4)]',
 };
 
+// 4x4 mode ranges for coloring/lettering (approximate)
 const getLetter = (num: number) => {
+    if (num <= 19) return 'N';
+    if (num <= 38) return 'E';
+    if (num <= 57) return 'O';
+    return 'N'; // Just using NEON for 4 columns? Or just stick to standard?
+    // User said "16-Grid". Standard 75 ball has 5 ranges. 
+    // Let's stick to simple "Ball" logic or standard Bingo letters if using 1-75.
+    // 1-15 B, 16-30 I ... 
     if (num <= 15) return 'B';
     if (num <= 30) return 'I';
     if (num <= 45) return 'N';
@@ -27,76 +35,83 @@ export const LotteryDrum = ({ currentNumber }: Props) => {
     const [isRolling, setIsRolling] = useState(false);
     const { playShuffle, stopShuffle } = useSoundEffects();
 
+    // Slot machine scrolling numbers
+    const [scrollNumbers, setScrollNumbers] = useState<number[]>([]);
+
     useEffect(() => {
         if (currentNumber !== null) {
-            // Start rolling effect
             setIsRolling(true);
             playShuffle();
 
-            const interval = setInterval(() => {
-                setDisplayNumber(Math.floor(Math.random() * 75) + 1);
-            }, 50); // Fast shuffle
+            // Generate a sequence of random numbers for the "blur" effect
+            const sequence = Array.from({ length: 20 }, () => Math.floor(Math.random() * 75) + 1);
+            setScrollNumbers(sequence);
 
-            // Stop after 2 seconds and show real number
+            // After animation, show the result
             const timeout = setTimeout(() => {
-                clearInterval(interval);
+                setIsRolling(false);
                 stopShuffle();
                 setDisplayNumber(currentNumber);
-                setIsRolling(false);
-            }, 2000);
+            }, 2500);
 
             return () => {
-                clearInterval(interval);
                 clearTimeout(timeout);
                 stopShuffle();
             };
         }
     }, [currentNumber, playShuffle, stopShuffle]);
 
-    // Determine style based on rolling state or final number
-    const currentStyle = isRolling
-        ? 'border-gray-500 text-gray-400 animate-pulse' // Generic style while rolling
-        : displayNumber
-            ? BALL_COLORS[getLetter(displayNumber) as keyof typeof BALL_COLORS]
-            : 'border-gray-700 text-gray-700';
+    const currentLetter = displayNumber ? getLetter(displayNumber) : '';
+    const colorClass = displayNumber
+        ? BALL_COLORS[currentLetter as keyof typeof BALL_COLORS] || 'border-white text-white'
+        : 'border-gray-700 text-gray-700';
 
     return (
         <div className="flex items-center justify-center p-10">
-            <div className="relative w-72 h-72 flex items-center justify-center">
-                {/* Outer Ring - Las Vegas Lights style */}
-                <div className="absolute inset-0 rounded-full border-4 border-dashed border-gray-800 animate-[spin_8s_linear_infinite]" />
-                <div className="absolute inset-0 rounded-full border-t-4 border-neon-cyan/30 animate-[spin_3s_linear_infinite_reverse]" />
+            <div className="relative w-80 h-80 flex items-center justify-center">
+                {/* Decorative Rings */}
+                <div className="absolute inset-0 rounded-full border-4 border-dashed border-gray-800 animate-[spin_10s_linear_infinite]" />
+                <div className="absolute inset-0 rounded-full border-t-4 border-neon-cyan/50 animate-[spin_2s_linear_infinite]" />
 
-                <AnimatePresence mode="popLayout">
-                    {displayNumber ? (
-                        <motion.div
-                            key={isRolling ? 'rolling' : displayNumber}
-                            initial={isRolling ? { scale: 0.8, filter: 'blur(4px)' } : { scale: 1.2, filter: 'blur(0px)' }}
-                            animate={isRolling
-                                ? { scale: [0.9, 1.1, 0.9], transition: { repeat: Infinity, duration: 0.2 } }
-                                : { scale: 1, filter: 'blur(0px)', rotate: [0, -5, 5, 0], transition: { type: "spring", bounce: 0.5 } }
-                            }
-                            className={`
-                w-56 h-56 rounded-full border-8 bg-deep-gray 
-                flex flex-col items-center justify-center 
-                z-10 bg-opacity-95 backdrop-blur-xl shadow-2xl
-                ${currentStyle}
-                transition-colors duration-200
-              `}
-                        >
-                            <span className="text-5xl font-bold uppercase opacity-60 mb-2">
-                                {isRolling ? '??' : getLetter(displayNumber)}
-                            </span>
-                            <span className={`font-black ${isRolling ? 'text-9xl opacity-50' : 'text-9xl'}`}>
-                                {displayNumber}
-                            </span>
-                        </motion.div>
-                    ) : (
-                        <div className="text-neon-cyan/50 text-2xl font-black font-mono animate-pulse tracking-widest text-center">
-                            READY<br />TO DRAW
-                        </div>
-                    )}
-                </AnimatePresence>
+                {/* The Drum */}
+                <div className={`
+             w-64 h-64 rounded-full border-8 bg-deep-gray 
+             flex flex-col items-center justify-center overflow-hidden
+             z-10 bg-opacity-95 backdrop-blur-xl shadow-2xl relative
+             ${isRolling ? 'border-neon-magenta shadow-[0_0_30px_rgba(255,0,255,0.3)]' : colorClass}
+             transition-all duration-500
+        `}>
+                    <AnimatePresence mode="wait">
+                        {isRolling ? (
+                            <motion.div
+                                className="flex flex-col items-center justify-start absolute top-0"
+                                animate={{ y: [0, -1000] }}
+                                transition={{ duration: 2.5, ease: "linear" }}
+                            >
+                                {/* Render a tall strip of numbers for sliding effect */}
+                                {scrollNumbers.concat(scrollNumbers).map((n, i) => (
+                                    <div key={i} className="h-64 flex items-center justify-center text-8xl font-black text-gray-500 blur-[2px]">
+                                        {n}
+                                    </div>
+                                ))}
+                            </motion.div>
+                        ) : displayNumber ? (
+                            <motion.div
+                                key={displayNumber}
+                                initial={{ scale: 0.5, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="flex flex-col items-center"
+                            >
+                                <span className="text-4xl font-bold uppercase opacity-60 mb-2">{getLetter(displayNumber)}</span>
+                                <span className="text-9xl font-black dropping-shadow-neon">{displayNumber}</span>
+                            </motion.div>
+                        ) : (
+                            <div className="text-neon-cyan/40 text-2xl font-black font-mono animate-pulse text-center">
+                                WAITING
+                            </div>
+                        )}
+                    </AnimatePresence>
+                </div>
             </div>
         </div>
     );

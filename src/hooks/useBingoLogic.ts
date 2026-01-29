@@ -1,63 +1,72 @@
 import { useCallback } from 'react';
 
-// Standard 75-ball Bingo columns
-// B: 1-15, I: 16-30, N: 31-45, G: 46-60, O: 61-75
+// 4x4 Grid Ranges (1-75 split into 4 columns)
+// Col 0: 1-19
+// Col 1: 20-38
+// Col 2: 39-57
+// Col 3: 58-75
 const COL_RANGES = {
-    0: { min: 1, max: 15 },  // B
-    1: { min: 16, max: 30 }, // I
-    2: { min: 31, max: 45 }, // N
-    3: { min: 46, max: 60 }, // G
-    4: { min: 61, max: 75 }, // O
+    0: { min: 1, max: 19 },
+    1: { min: 20, max: 38 },
+    2: { min: 39, max: 57 },
+    3: { min: 58, max: 75 },
 };
 
 export const useBingoLogic = () => {
 
     const generateCard = useCallback(() => {
-        const card = new Array(25).fill(0);
+        const card = new Array(16).fill(0); // 4x4 = 16
 
         // Generate columns
-        for (let col = 0; col < 5; col++) {
+        for (let col = 0; col < 4; col++) {
             const { min, max } = COL_RANGES[col as keyof typeof COL_RANGES];
             const numbers = new Set<number>();
 
-            while (numbers.size < 5) {
+            while (numbers.size < 4) {
                 numbers.add(Math.floor(Math.random() * (max - min + 1)) + min);
             }
 
-            const colNums = Array.from(numbers); // No need to sort necessarily, but classic bingo often isn't sorted per column, but sometimes is. Let's keep random.
+            const colNums = Array.from(numbers);
 
-            // Fill the grid column-wise: indices 0, 5, 10, 15, 20 are col 0 (B)
-            for (let row = 0; row < 5; row++) {
-                card[row * 5 + col] = colNums[row];
+            // Fill the grid column-wise
+            // Indexes for 4x4:
+            // 0, 1, 2, 3
+            // 4, 5, 6, 7
+            // 8, 9, 10, 11
+            // 12, 13, 14, 15
+            // Col 0 is indices: 0, 4, 8, 12
+            for (let row = 0; row < 4; row++) {
+                card[row * 4 + col] = colNums[row];
             }
         }
 
-        // Free space at center (12 = 2 * 5 + 2) represents N column, 3rd row
-        card[12] = 0; // 0 represents FREE SPACE
+        // No free space in 4x4 usually, or strictly requested? 
+        // User said "16 numbers total", implies full grid.
 
         return card;
     }, []);
 
     const checkBingo = useCallback((markedIndices: number[]) => {
-        // 0 is also considered marked (free space), so ensure it's in the list or logically handled
         const marked = new Set(markedIndices);
-        marked.add(12); // Always mark free space
 
-        // Rows
-        for (let i = 0; i < 5; i++) {
-            if ([0, 1, 2, 3, 4].every(offset => marked.has(i * 5 + offset))) return true;
+        // Win condition: 3 LINES (Any combination of Row, Col, Diagonal)
+        let lineCount = 0;
+
+        // Rows (4 rows)
+        for (let i = 0; i < 4; i++) {
+            if ([0, 1, 2, 3].every(offset => marked.has(i * 4 + offset))) lineCount++;
         }
 
-        // Cols
-        for (let i = 0; i < 5; i++) {
-            if ([0, 1, 2, 3, 4].every(offset => marked.has(offset * 5 + i))) return true;
+        // Cols (4 cols)
+        for (let i = 0; i < 4; i++) {
+            if ([0, 1, 2, 3].every(offset => marked.has(offset * 4 + i))) lineCount++;
         }
 
-        // Diagonals
-        if ([0, 6, 12, 18, 24].every(idx => marked.has(idx))) return true;
-        if ([4, 8, 12, 16, 20].every(idx => marked.has(idx))) return true;
+        // Diagonals (2 diagonals)
+        if ([0, 5, 10, 15].every(idx => marked.has(idx))) lineCount++; // Top-Left to Bottom-Right
+        if ([3, 6, 9, 12].every(idx => marked.has(idx))) lineCount++;  // Top-Right to Bottom-Left
 
-        return false;
+        return lineCount >= 3;
     }, []);
 
     return { generateCard, checkBingo };

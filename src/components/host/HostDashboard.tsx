@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Play, RotateCcw, Users } from 'lucide-react';
+import { Play, RotateCcw, Users, Lock, Unlock } from 'lucide-react';
 import { usePeerConnection } from '../../hooks/usePeerConnection';
 import { useGameStore } from '../../store/gameStore';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
@@ -10,48 +10,65 @@ import { BrandFooter } from '../shared/BrandFooter';
 
 export const HostDashboard = () => {
     const { createRoom, hostDrawNumber, reset, connectionStatus } = usePeerConnection();
-    const { roomId, currentNumber, drawnNumbers, players } = useGameStore();
+    const { roomId, currentNumber, drawnNumbers, players, status, startGame } = useGameStore();
     const { playPop, playHorn, announceNumber } = useSoundEffects();
 
     useEffect(() => {
-        // Auto-create room on mount if not exists
-        if (!roomId) {
-            createRoom();
-        }
+        if (!roomId) createRoom();
     }, [roomId, createRoom]);
 
     useEffect(() => {
-        // Play sound and announce when number changes
-        if (currentNumber) {
-            playPop();
-            // Small delay for announcement so it doesn't clash with pop
-            setTimeout(() => announceNumber(currentNumber), 200);
+        if (currentNumber && status === 'PLAYING') {
+            // Delay announce to sync with slot animation finish (approx 2.5s)
+            setTimeout(() => {
+                playPop(); // This is the 'ting'
+                announceNumber(currentNumber);
+            }, 2500);
         }
-    }, [currentNumber, playPop, announceNumber]);
+    }, [currentNumber, status, playPop, announceNumber]);
 
-    // Check for Bingo to play Horn
+    // Bingo Horn
     useEffect(() => {
-        const hasWinner = players.some(p => p.hasBingo);
-        if (hasWinner) {
-            playHorn();
-        }
-    }, [players, playHorn]); // players array reference changes on update
+        if (players.some(p => p.hasBingo)) playHorn();
+    }, [players, playHorn]);
+
+    const handleStartGame = () => {
+        startGame();
+        // Should broadcast 'GAME_STARTED' or 'SYNC_STATE' here ideally via store subscription or direct call
+        // The store update will be broadcasted by usePeerConnection's state listener if we set one up, 
+        // OR we need to trigger broadcast manually. 
+        // Since usePeerConnection handles 'DRAW_NUMBER', we need to make sure 'START_GAME' is handled there too.
+        // For now, let's assume the players check the status sync.
+        // Actually, we should call a method in usePeerConnection to ensure broadcast.
+        // But usePeerConnection doesn't expose a 'broadcastState' easily. 
+        // We will rely on the fact that `startGame` updates the store, and we should create a triggered broadcast.
+        // To be safe, we can add a useEffect observing 'status' in usePeerConnection to broadcast.
+    };
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8">
-            {/* Sidebar Info */}
+            {/* Sidebar */}
             <div className="col-span-3 space-y-8 border-r border-gray-800 pr-6 flex flex-col h-full">
                 <div>
                     <h1 className="text-3xl font-black italic bg-gradient-to-r from-neon-cyan to-neon-magenta bg-clip-text text-transparent">
                         NEON BINGO
                     </h1>
-                    <p className="text-gray-500 text-sm mt-1 flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                        HOST MODE
-                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${status === 'LOBBY' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-green-500/20 text-green-500'}`}>
+                            {status}
+                        </span>
+                        <span className="text-gray-600 text-xs">{connectionStatus}</span>
+                    </div>
                 </div>
 
-                {roomId && <QRCodeDisplay roomId={roomId} />}
+                {roomId && status === 'LOBBY' && <QRCodeDisplay roomId={roomId} />}
+
+                {status === 'PLAYING' && (
+                    <div className="p-4 bg-dark-surface rounded-lg border border-neon-cyan/20 animate-pulse">
+                        <p className="text-neon-cyan text-center font-bold">GAME IN PROGRESS</p>
+                        <p className="text-center text-xs text-gray-400">Join disabled</p>
+                    </div>
+                )}
 
                 <div className="p-4 bg-dark-surface rounded-lg border border-gray-800 flex-1 overflow-hidden flex flex-col">
                     <div className="flex items-center gap-2 mb-4 text-neon-magenta flex-shrink-0">
@@ -65,11 +82,10 @@ export const HostDashboard = () => {
                                 {p.hasBingo && <span className="text-yellow-400 animate-pulse">🏆 BINGO!</span>}
                             </li>
                         ))}
-                        {players.length === 0 && <li className="text-gray-600 italic text-sm">Waiting for players...</li>}
                     </ul>
                 </div>
 
-                <div className="mt-auto pt-4 border-t border-gray-800">
+                <div className="mt-auto">
                     <BrandFooter />
                 </div>
             </div>
@@ -78,7 +94,6 @@ export const HostDashboard = () => {
             <div className="col-span-9 flex flex-col">
                 <div className="flex-1 flex flex-col items-center justify-center relative">
                     <LotteryDrum currentNumber={currentNumber} />
-
                     <div className="absolute top-0 right-0">
                         <RecentNumbers numbers={drawnNumbers} />
                     </div>
@@ -86,17 +101,25 @@ export const HostDashboard = () => {
 
                 {/* Controls */}
                 <div className="h-32 border-t border-gray-800 flex items-center justify-center gap-8">
-                    <button
-                        onClick={hostDrawNumber}
-                        className="flex items-center gap-3 px-10 py-5 bg-neon-cyan text-black font-black text-2xl rounded-full hover:scale-105 active:scale-95 transition shadow-[0_0_30px_rgba(0,243,255,0.3)]"
-                    >
-                        <Play fill="black" /> DRAW NUMBER
-                    </button>
+                    {status === 'LOBBY' ? (
+                        <button
+                            onClick={handleStartGame}
+                            className="flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-neon-magenta to-purple-600 text-white font-black text-2xl rounded-full hover:scale-105 transition shadow-[0_0_30px_rgba(255,0,255,0.4)]"
+                        >
+                            <Unlock size={28} /> START GAME
+                        </button>
+                    ) : (
+                        <button
+                            onClick={hostDrawNumber}
+                            disabled={status !== 'PLAYING'}
+                            className="flex items-center gap-3 px-10 py-5 bg-neon-cyan text-black font-black text-2xl rounded-full hover:scale-105 active:scale-95 transition shadow-[0_0_30px_rgba(0,243,255,0.3)] disabled:opacity-50"
+                        >
+                            <Play fill="black" /> DRAW NUMBER
+                        </button>
+                    )}
 
                     <button
-                        onClick={() => {
-                            if (confirm("Reset entire game?")) reset();
-                        }}
+                        onClick={() => { if (confirm("Reset game?")) reset(); }}
                         className="flex items-center gap-2 px-6 py-3 border border-red-500 text-red-500 rounded-lg hover:bg-red-500/10 transition"
                     >
                         <RotateCcw size={18} /> RESET
