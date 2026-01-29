@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import Peer, { DataConnection } from 'peerjs';
+import Peer, { type DataConnection } from 'peerjs';
 import { useGameStore } from '../store/gameStore';
 
 type Payload =
