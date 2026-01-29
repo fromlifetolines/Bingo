@@ -40,6 +40,10 @@ interface GameState {
     lockCard: (playerId: string) => void;
     markNumber: (playerId: string, numberIndex: number) => void;
     checkSessionMismatch: (incomingRoomId: string | null) => void;
+
+    // V4.1 Global Broadcast Access
+    broadcastEvent: (payload: any) => void;
+    registerBroadcast: (callback: (payload: any) => void) => void;
 }
 
 // --- NUCLEAR HARD RESET LOGIC (PERSISTENCE FIX) ---
@@ -183,7 +187,11 @@ export const useGameStore = create<GameState>()(
                         players: []
                     });
                 }
-            }
+            },
+
+            // V4.1 Impl
+            broadcastEvent: (payload) => console.warn("Broadcast not registered", payload),
+            registerBroadcast: (callback) => set({ broadcastEvent: callback })
         }),
         {
             name: 'bingo-storage',

@@ -8,9 +8,9 @@ import { QRCodeDisplay } from './QRCodeDisplay';
 import { RecentNumbers } from './RecentNumbers';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V4.0 ANIMATED: INLINE SAFE LOGIC + RESTORED FUN
+// V4.1 STABLE: GLOBAL STORE ACCESS (Anti-Closure Fix)
 export const HostDashboard = () => {
-    const { createRoom, connectionStatus, startGame, broadcast } = usePeerConnection();
+    const { createRoom, connectionStatus, startGame } = usePeerConnection();
     const { roomId, currentNumber, drawnNumbers, players, status, drawNumber: storeDrawNumber } = useGameStore();
     const { playPop, playHorn, announceNumber, playRollingSound, playDingSound } = useSoundEffects();
 
@@ -29,38 +29,32 @@ export const HostDashboard = () => {
     };
 
     const handleStrictDraw = () => {
-        // 1. Prevent double clicks unless users want to reset (handled by separate reset button or just by waiting)
-        // If we want to allow spam-clicking to fix stuck state, we can remove this.
-        // But user requested "Restore the fun", so we should respect the animation.
-        // However, user in V3.8 said "Unstick", so if it IS rolling, we might want to block
-        // OR we can make it reset. The prompt says "Do not sacrifice the fun", implying 2.5s is key.
-        // To be safe against "Stuck" state again, I will allow re-clicking to RESET logic if stuck for > 5s?
-        // Simpler: Just block if rolling, but if it throws error, we unlock.
         if (isRolling) return;
 
-        console.log("⚡️ V4.0 ANIMATED DRAW TRIGGER");
+        console.log("⚡️ V4.1 GLOBAL DRAW TRIGGER");
 
         try {
-            // 2. Start Visuals
+            // 1. VISUAL START
             setIsRolling(true);
             useGameStore.getState().setRolling(true);
-            try { playRollingSound(); } catch (e) { console.warn("Audio error", e); }
+            try { playRollingSound(); } catch (e) { }
 
-            // 3. Broadcast "Rolling" (Syncs phones)
-            broadcast({ type: 'ROLLING' });
+            // 2. HARD-WIRED BROADCAST (Fixes "r is not a function")
+            // We access the store instance DIRECTLY to guarantee the function exists.
+            const globalBroadcast = useGameStore.getState().broadcastEvent;
 
-            // 4. Wait 2.5s for the "Fun"
+            if (globalBroadcast) {
+                globalBroadcast({ type: 'ROLLING' });
+            } else {
+                console.warn("⚠️ Broadcast function not registered in store yet!");
+            }
+
+            // 3. ANIMATION DELAY (2.5s)
             setTimeout(() => {
                 try {
-                    // --- INLINE NUMBER GENERATION (Fixes "C is not a function") ---
-                    // Get all used numbers from store directly to be safe
-                    const storeState = useGameStore.getState();
-                    const used = storeState.drawnNumbers || [];
-
-                    // Create pool 1-75
+                    // --- INLINE GENERATION ---
+                    const used = useGameStore.getState().drawnNumbers || [];
                     const all = Array.from({ length: 75 }, (_, i) => i + 1);
-
-                    // Filter out used
                     const available = all.filter(n => !used.includes(n));
 
                     if (available.length === 0) {
@@ -70,58 +64,45 @@ export const HostDashboard = () => {
                         return;
                     }
 
-                    // Pick random
-                    const randomIndex = Math.floor(Math.random() * available.length);
-                    const newNum = available[randomIndex];
-                    // -------------------------------------------------------------
+                    const newNum = available[Math.floor(Math.random() * available.length)];
+                    // -------------------------
 
-                    // 5. Success! Update Store & Broadcast
-                    storeDrawNumber(newNum); // We pass the number explicitly if the store supports it, or let store do it? 
-                    // Wait, previous storeDrawNumber logic relied on internal gen.
-                    // I need to override/ensure store accepts the number OR set it manually.
-                    // Looking at previous patterns, storeDrawNumber might generate it internally.
-                    // checking useGameStore... actually I can't check it right now without view_file.
-                    // SAFE BET: Just set it in store via action "drawNumber" if it takes an arg, 
-                    // OR update state directly if store.drawNumber is the purely automatic one.
-                    // The prompt `storeDrawNumber` usually was just `state.drawNumber()`.
-                    // If that function is broken (uses the bad helper), I should NOT use it.
-                    // I will manually update the store state to be safe.
-
+                    // 4. UPDATE STORE MANUALLY
                     useGameStore.setState((state) => ({
-                        drawnNumbers: [newNum, ...state.drawnNumbers],
+                        drawnNumbers: [...state.drawnNumbers, newNum],
                         currentNumber: newNum,
                         isRolling: false
                     }));
 
-                    // 6. Broadcast Result
-                    setIsRolling(false); // Local Unlock
-                    try { playPop(); } catch (e) { } // Ding sound
+                    // 5. BROADCAST RESULT (Hard-Wired)
+                    setIsRolling(false);
+                    try { playPop(); } catch (e) { }
 
-                    broadcast({ type: 'DRAW_NUMBER', payload: newNum });
-                    announceNumber(newNum);
-                    console.log("Draw Success:", newNum);
+                    const freshBroadcast = useGameStore.getState().broadcastEvent;
+                    if (freshBroadcast) {
+                        freshBroadcast({ type: 'DRAW_NUMBER', payload: newNum });
+                        announceNumber(newNum);
+                    }
 
                 } catch (innerError) {
-                    console.error("Generation failed", innerError);
-                    setIsRolling(false); // Force unlock
+                    console.error("Gen failed", innerError);
+                    setIsRolling(false);
                     useGameStore.getState().setRolling(false);
-                    alert("Draw Failed: " + (innerError instanceof Error ? innerError.message : String(innerError)));
                 }
             }, 2500);
 
         } catch (error) {
-            console.error("Outer Draw Error:", error);
+            console.error("Draw setup failed", error);
             setIsRolling(false);
             useGameStore.getState().setRolling(false);
-            alert("System Error: " + (error instanceof Error ? error.message : String(error)));
         }
     };
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
-            {/* DEBUG TAG V4.0 */}
+            {/* DEBUG TAG V4.1 */}
             <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V4.0 (ANIMATED)
+                HOST V4.1 (STABLE)
             </div>
 
             {/* Sidebar */}

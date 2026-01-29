@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Peer, { type DataConnection } from 'peerjs';
 import { useGameStore } from '../store/gameStore';
 
@@ -184,6 +184,19 @@ export const usePeerConnection = () => {
             if (conn.open) conn.send(data);
         });
     };
+
+    // V4.1: Register for global access
+    if (useGameStore.getState().registerBroadcast) {
+        // Use effect to ensure it's registered only when changed/mounted
+        // But we are in a hook body, so we can't condition hooks. 
+        // Actually, we should use useEffect.
+    }
+    // Correct place: inside useEffect or just create the function and assume component will effect it?
+    // Let's use useEffect to register it on mount.
+
+    useEffect(() => {
+        useGameStore.getState().registerBroadcast(broadcast);
+    }, []);
 
     const hostDrawNumber = async () => {
         const state = useGameStore.getState();
