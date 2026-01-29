@@ -8,7 +8,7 @@ import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.1 REWRITE: FORCED UPDATE + AGGRESSIVE AUTO-GEN
+// V3.2 LOCAL FIRST REWRITE
 export const PlayerDashboard = () => {
     const { joinRoom, connectionStatus, lockMyCard } = usePeerConnection();
     const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard, isRolling } = useGameStore();
@@ -18,6 +18,7 @@ export const PlayerDashboard = () => {
     const [playerName, setPlayerName] = useState('');
     const [hasJoined, setHasJoined] = useState(false);
     const [isStuck, setIsStuck] = useState(false);
+    const [localRolling, setLocalRolling] = useState(false);
 
     const handleManualReset = () => {
         localStorage.clear();
@@ -37,10 +38,8 @@ export const PlayerDashboard = () => {
 
         joinRoom(joinId, playerName);
         const card = generateCard();
-        setTimeout(() => {
-            updatePlayerCard(newId, card);
-        }, 50);
-
+        // Immediate local store update
+        updatePlayerCard(newId, card);
         setHasJoined(true);
     };
 
@@ -52,14 +51,15 @@ export const PlayerDashboard = () => {
 
     const handleLock = () => {
         if (!myPlayer) return;
-        const confirmed = window.confirm("Lock this card? You won't be able to reroll.");
-        if (confirmed) {
+        if (window.confirm("Lock this card? You won't be able to reroll.")) {
             lockMyCard(myPlayer.id);
         }
     };
 
     const handleMark = (index: number) => {
-        if (!myPlayer || status !== 'PLAYING') return;
+        if (!myPlayer || status !== 'PLAYING') return; // Strict status check? User just said 'local first'
+        // We allow marking if number matches, regardless of strict status play
+        // But store usually enforces status. We follow store.
 
         const store = useGameStore.getState();
         store.markNumber(myPlayer.id, index);
@@ -68,9 +68,7 @@ export const PlayerDashboard = () => {
             ? myPlayer.markedIndices.filter(i => i !== index)
             : [...myPlayer.markedIndices, index];
 
-        if (checkBingo(newMarked)) {
-            // Check logic
-        }
+        checkBingo(newMarked);
     };
 
     const triggerWin = () => {
@@ -110,52 +108,60 @@ export const PlayerDashboard = () => {
         return () => clearTimeout(stuckTimer);
     }, [joinRoom]);
 
-    // FIX 1: AGGRESSIVE AUTO-GENETATE (Updated V3.1)
+    // FIX 1: BRUTE FORCE AUTO-GEN (V3.2)
+    // Runs once on mount, checks local state/store immediately.
     useEffect(() => {
-        const savedId = localStorage.getItem('my_bingo_player_id');
-        if (!savedId) return;
+        const savedId = localStorage.getItem('my_bingo_player_id') || 'temp-id'; // Fallback if brand new
+        // We can't really generate for 'temp-id' effectively if we haven't joined, 
+        // but if we are here (mounted), and maybe restoring...
 
-        const currentState = useGameStore.getState();
-        const me = currentState.players.find(p => p.id === savedId);
+        const state = useGameStore.getState();
+        const me = state.players.find(p => p.id === savedId);
 
-        // If connected + NO card -> FORCE GEN
         if (me && (!me.card || me.card.length === 0)) {
-            console.log("⚡️ V3.1 FORCE GEN - FOUND EMPTY CARD");
+            console.log("⚡️ V3.2 LOCAL GEN - Brute forcing card");
             const newCard = generateCard();
             updatePlayerCard(savedId, newCard);
         }
-    }, [players, generateCard, updatePlayerCard]);
+    }, []);
 
-    // FIX 3: REACTIVE AUTO-MARK (V3.1)
+    // FIX 2: SYNC & AUTO-MARK (V3.2)
+    // Directly subscribe to currentNumber changes
     useEffect(() => {
-        if (!currentNumber || !myPlayer) return;
+        if (currentNumber) {
+            setLocalRolling(false); // Stop rolling immediately on receipt
 
-        const targetStr = currentNumber.toString();
-        const idx = myPlayer.card.findIndex(n => n.toString() === targetStr);
-
-        if (idx !== -1) {
-            if (!myPlayer.markedIndices.includes(idx)) {
-                console.log(`[AUTO-MARK] Index ${idx} Match. Marking...`);
-                handleMark(idx);
-                if (navigator.vibrate) navigator.vibrate(200);
+            // Auto-Mark Logic
+            if (myPlayer) {
+                const strNum = currentNumber.toString();
+                const idx = myPlayer.card.findIndex(n => n.toString() === strNum);
+                if (idx !== -1 && !myPlayer.markedIndices.includes(idx)) {
+                    console.log(`[AUTO-MARK] V3.2 Match ${strNum} at ${idx}`);
+                    handleMark(idx);
+                    if (navigator.vibrate) navigator.vibrate(200);
+                }
             }
         }
-    }, [currentNumber, myPlayer]);
+    }, [currentNumber, myPlayer]); // React to number updates
+
+    // Fix Rolling State from Store (or peer event)
+    useEffect(() => {
+        if (isRolling) setLocalRolling(true);
+        else setLocalRolling(false);
+    }, [isRolling]);
+
 
     if (hasJoined && !myPlayer) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4 bg-deep-gray p-4">
                 <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.1 (FORCED)
+                    PLAYER V3.2 (LOCAL)
                 </div>
                 <h2 className="text-xl font-bold text-neon-cyan animate-pulse">Connecting to Host...</h2>
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
                 {isStuck && (
                     <div className="flex flex-col items-center animate-fade-in mt-4">
-                        <button
-                            onClick={handleManualReset}
-                            className="px-8 py-3 bg-red-500/10 border-2 border-red-500 text-red-400 rounded-full font-bold"
-                        >
+                        <button onClick={handleManualReset} className="px-8 py-3 bg-red-500/10 border-2 border-red-500 text-red-400 rounded-full font-bold">
                             Stuck? Tap to Retry
                         </button>
                     </div>
@@ -168,7 +174,7 @@ export const PlayerDashboard = () => {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
                 <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.1 (FORCED)
+                    PLAYER V3.2 (LOCAL)
                 </div>
                 <div className="w-full max-w-sm bg-dark-surface p-6 rounded-xl border border-gray-800 shadow-2xl space-y-4">
                     <h1 className="text-3xl font-black text-center text-white italic">NEON<span className="text-neon-cyan">BINGO</span></h1>
@@ -185,9 +191,6 @@ export const PlayerDashboard = () => {
                     >
                         JOIN GAME
                     </button>
-                    <div className="text-xs text-center text-gray-500 mt-2">
-                        Build v3.1 FORCED UPDATE
-                    </div>
                 </div>
             </div>
         )
@@ -198,11 +201,11 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V3.1 (FORCED UPDATE)
+                PLAYER V3.2 (LOCAL)
             </div>
 
             {/* SYNC OVERLAY */}
-            {isRolling && (
+            {(localRolling || isRolling) && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center flex-col">
                     <div className="text-neon-cyan text-4xl font-black animate-bounce">ROLLING...</div>
                     <div className="text-white text-sm mt-2">Good Luck!</div>

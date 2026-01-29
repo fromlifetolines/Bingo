@@ -8,7 +8,7 @@ import { QRCodeDisplay } from './QRCodeDisplay';
 import { RecentNumbers } from './RecentNumbers';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.1 REWRITE: FORCED UPDATE + ASYNC UI OPTIMIZATION
+// V3.2 LOCAL FIRST REWRITE
 export const HostDashboard = () => {
     const { createRoom, connectionStatus, startGame, broadcast } = usePeerConnection();
     const { roomId, currentNumber, drawnNumbers, players, status, drawNumber: storeDrawNumber } = useGameStore();
@@ -31,40 +31,39 @@ export const HostDashboard = () => {
     const handleStrictDraw = () => {
         if (isRolling) return;
 
-        // 1. UI UPDATE FIRST (Solves Lag)
+        // 1. VISUAL & STATE
         setIsRolling(true);
-        // Play sound (assuming we rely on visual mostly or silent drum, prompt asked for playRollingSound but we don't have it imported, relying on UI state)
+        useGameStore.getState().setRolling(true); // Sync local store immediately
 
-        // 2. NETWORK NEXT (Non-blocking)
-        // Use requestAnimationFrame to ensure the UI paints the disabled state/rolling text BEFORE we do any network work
-        requestAnimationFrame(() => {
-            broadcast({ type: 'ROLLING' });
-            useGameStore.getState().setRolling(true);
-        });
+        // 2. BROADCAST ROLLING (Immediate)
+        // We broadcast immediately to clear player screens
+        broadcast({ type: 'ROLLING' });
 
-        // 3. LOGIC LAST (Delayed)
+        // 3. WAIT (Reduced to 2500ms for responsiveness)
         setTimeout(() => {
+            // 4. GENERATE
             storeDrawNumber();
             const newState = useGameStore.getState();
             const newNum = newState.currentNumber;
 
+            // 5. UPDATE LOCAL
             setIsRolling(false);
             useGameStore.getState().setRolling(false);
             playPop();
 
-            // 4. REVEAL TO MOBILE
+            // 6. BROADCAST RESULT
             if (newNum) {
                 broadcast({ type: 'DRAW_NUMBER', payload: newNum });
                 announceNumber(newNum);
             }
-        }, 3000);
+        }, 2500);
     };
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
-            {/* DEBUG TAG V3.1 */}
+            {/* DEBUG TAG V3.2 */}
             <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V3.1 (FORCED UPDATE)
+                HOST V3.2 (LOCAL)
             </div>
 
             {/* Sidebar */}
