@@ -5,8 +5,10 @@ import { useGameStore } from '../store/gameStore';
 type Payload =
     | { type: 'SYNC_STATE'; payload: any }
     | { type: 'DRAW_NUMBER'; payload: number }
+    | { type: 'ROLLING' } // New
     | { type: 'PLAYER_JOIN'; payload: { id: string; name: string } }
     | { type: 'PLAYER_BINGO'; payload: string }
+    | { type: 'PLAYER_LOCK'; payload: string } // New: Player sends this to Host
     | { type: 'RESET_GAME' };
 
 export const usePeerConnection = () => {
@@ -34,12 +36,26 @@ export const usePeerConnection = () => {
                 }
                 break;
 
+            case 'PLAYER_LOCK':
+                if (role === 'HOST') {
+                    useGameStore.getState().lockCard(data.payload);
+                }
+                break;
+
+            case 'ROLLING':
+                // Players show rolling state
+                if (role === 'PLAYER') {
+                    useGameStore.getState().setRolling(true);
+                }
+                break;
+
             case 'DRAW_NUMBER':
                 // Player received number
                 if (role === 'PLAYER') {
                     useGameStore.setState((state) => ({
                         drawnNumbers: [...state.drawnNumbers, data.payload],
-                        currentNumber: data.payload
+                        currentNumber: data.payload,
+                        isRolling: false // Stop rolling when number arrives
                     }));
                 }
                 break;
@@ -48,7 +64,8 @@ export const usePeerConnection = () => {
                 if (role === 'PLAYER') {
                     useGameStore.setState(() => ({
                         drawnNumbers: data.payload.drawnNumbers,
-                        currentNumber: data.payload.currentNumber
+                        currentNumber: data.payload.currentNumber,
+                        isRolling: false
                     }));
                 }
                 break;
@@ -130,11 +147,31 @@ export const usePeerConnection = () => {
     };
 
     // Wrapper for Host actions that also need to broadcast
-    const hostDrawNumber = () => {
+    const hostDrawNumber = async () => {
+        // 1. Broadcast Rolling immediately
+        if (useGameStore.getState().status !== 'PLAYING') return;
+
+        broadcast({ type: 'ROLLING' });
+        useGameStore.getState().setRolling(true); // Local update
+
+        // 2. Wait for animation (2.5s)
+        await new Promise(resolve => setTimeout(resolve, 2500));
+
+        // 3. Draw and Broadcast
         storeDrawNumber();
         const state = useGameStore.getState();
         if (state.currentNumber) {
             broadcast({ type: 'DRAW_NUMBER', payload: state.currentNumber });
+        }
+        useGameStore.getState().setRolling(false);
+    };
+
+    const lockMyCard = (playerId: string) => {
+        // Player locks themselves
+        useGameStore.getState().lockCard(playerId);
+        // Notify host
+        if (peerRef.current && connectionsRef.current[0]) {
+            connectionsRef.current[0].send({ type: 'PLAYER_LOCK', payload: playerId });
         }
     };
 
@@ -148,6 +185,7 @@ export const usePeerConnection = () => {
         joinRoom,
         connectionStatus,
         hostDrawNumber,
+        lockMyCard,
         reset
     };
 };

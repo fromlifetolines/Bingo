@@ -74,6 +74,9 @@ export const HostDashboard = () => {
                     <div className="flex items-center gap-2 mb-4 text-neon-magenta flex-shrink-0">
                         <Users size={20} />
                         <span className="font-bold">PLAYERS ({players.length})</span>
+                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">
+                            {players.filter(p => p.isLocked).length} READY
+                        </span>
                     </div>
                     <ul className="space-y-2 overflow-y-auto flex-1 h-0">
                         {players.map(p => (

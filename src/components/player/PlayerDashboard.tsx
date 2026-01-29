@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trophy, RefreshCw, Lock } from 'lucide-react';
+import { Trophy, RefreshCw, Lock, CheckCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useGameStore } from '../../store/gameStore';
 import { usePeerConnection } from '../../hooks/usePeerConnection';
@@ -9,8 +9,8 @@ import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
 
 export const PlayerDashboard = () => {
-    const { joinRoom, connectionStatus } = usePeerConnection();
-    const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard } = useGameStore();
+    const { joinRoom, connectionStatus, lockMyCard } = usePeerConnection();
+    const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard, isRolling } = useGameStore();
     const { generateCard, checkBingo } = useBingoLogic();
     const { playWin } = useSoundEffects();
 
@@ -19,27 +19,19 @@ export const PlayerDashboard = () => {
 
     // Persistence Check on Mount
     useEffect(() => {
-        // Zustand persist middleware rehydrates automatically.
-        // We just need to check if we are already in a room and have an ID.
-        // But local component state (playerName) might be empty.
-        // Let's see if we can recover from store.
         const storedPlayers = useGameStore.getState().players;
-        // In a real app we'd store "myPlayerId" in localStorage separately.
-        // For now, let's ask user to re-login or use heuristics.
-        // Actually, the user asked for persistence.
-        // Best approach: Store 'myPlayerId' in a separate persist store or just localStorage here.
         const savedId = localStorage.getItem('my_bingo_player_id');
         if (savedId) {
             const existing = storedPlayers.find(p => p.id === savedId);
             if (existing) {
                 setPlayerName(existing.name);
                 setHasJoined(true);
-                if (roomId) joinRoom(roomId, existing.name); // Re-establish peer connection
+                if (roomId) joinRoom(roomId, existing.name);
             }
         }
-    }, []);
+    }, [roomId, joinRoom]);
 
-    const myPlayer = players.find(p => p.name === playerName); // Still using name match if id logic is simple
+    const myPlayer = players.find(p => p.name === playerName);
 
     const handleJoin = () => {
         const params = new URLSearchParams(window.location.search);
@@ -47,21 +39,12 @@ export const PlayerDashboard = () => {
 
         if (!playerName || !joinId) return;
 
-        // Generate ID
-        const newId = crypto.randomUUID(); // Valid in modern browsers
+        const newId = crypto.randomUUID();
         localStorage.setItem('my_bingo_player_id', newId);
 
         joinRoom(joinId, playerName);
-
         const card = generateCard();
 
-        // We use a slight delay or optimistic update.
-        // But since we are using PeerJS, we need validity. 
-        // Let's just update local store immediately for "Lobby" feel.
-        // Note: joinRoom triggers store update via peer events usually? 
-        // In our simple logic, joinGame is called locally too.
-
-        // Wait for store to update with new player from joinRoom's local call
         setTimeout(() => {
             updatePlayerCard(newId, card);
         }, 100);
@@ -70,27 +53,30 @@ export const PlayerDashboard = () => {
     };
 
     const handleReroll = () => {
-        if (status !== 'LOBBY' || !myPlayer) return;
+        if (status !== 'LOBBY' || !myPlayer || myPlayer.isLocked) return;
         const newCard = generateCard();
         rerollCard(myPlayer.id, newCard);
     };
 
-    const handleMark = (index: number) => {
-        if (!myPlayer || status !== 'PLAYING') return; // Can only mark if playing
+    const handleLock = () => {
+        if (!myPlayer) return;
+        if (confirm("Lock this card? You won't be able to reroll.")) {
+            lockMyCard(myPlayer.id);
+        }
+    };
 
-        // Toggle mark
+    const handleMark = (index: number) => {
+        if (!myPlayer || status !== 'PLAYING') return;
+
         const store = useGameStore.getState();
         store.markNumber(myPlayer.id, index);
 
-        // Check win
-        // We need to fetch the *updated* marks. 
-        // Simplest is to check locally with the new array.
         const newMarked = myPlayer.markedIndices.includes(index)
             ? myPlayer.markedIndices.filter(i => i !== index)
             : [...myPlayer.markedIndices, index];
 
         if (checkBingo(newMarked)) {
-            // Let user click bingo
+            // Bingo logic handled by button
         }
     };
 
@@ -98,13 +84,11 @@ export const PlayerDashboard = () => {
         if (!myPlayer) return;
         confetti();
         playWin();
-        // Update store
         useGameStore.setState(state => ({
             players: state.players.map(p => p.id === myPlayer.id ? { ...p, hasBingo: true } : p)
         }));
     };
 
-    // Login Screen
     if (!hasJoined) {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
@@ -116,11 +100,15 @@ export const PlayerDashboard = () => {
                         value={playerName}
                         onChange={e => setPlayerName(e.target.value)}
                     />
-                    <button onClick={handleJoin} className="w-full bg-neon-cyan text-black font-bold p-4 rounded hover:scale-105 transition">
+                    <button
+                        onClick={handleJoin}
+                        disabled={!playerName}
+                        className="w-full bg-neon-cyan text-black font-bold p-4 rounded hover:scale-105 transition disabled:opacity-50"
+                    >
                         JOIN GAME
                     </button>
                     <div className="text-xs text-center text-gray-500 mt-2">
-                        Build v2.0 (16-Grid)
+                        Build v2.1 (Anti-Cheat)
                     </div>
                 </div>
             </div>
@@ -132,7 +120,15 @@ export const PlayerDashboard = () => {
     const isBingo = checkBingo(myPlayer.markedIndices);
 
     return (
-        <div className="min-h-screen bg-deep-gray text-white pb-32">
+        <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
+            {/* ROLLING OVERLAY */}
+            {isRolling && (
+                <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center flex-col">
+                    <div className="text-neon-cyan text-4xl font-black animate-bounce">ROLLING...</div>
+                    <div className="text-white text-sm mt-2">Good Luck!</div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="sticky top-0 bg-dark-surface/90 backdrop-blur border-b border-gray-800 p-4 z-20 flex justify-between items-center">
                 <div>
@@ -148,7 +144,7 @@ export const PlayerDashboard = () => {
             {/* Status Bar */}
             {status === 'LOBBY' && (
                 <div className="bg-yellow-500/10 p-2 text-center text-yellow-500 text-xs font-bold border-b border-yellow-500/20">
-                    WAITING FOR HOST TO START
+                    {myPlayer.isLocked ? "READY TO START" : "FINALIZE YOUR CARD"}
                 </div>
             )}
 
@@ -160,17 +156,31 @@ export const PlayerDashboard = () => {
                     onMark={handleMark}
                 />
 
-                {/* Reroll Button (Lobby Only) */}
+                {/* Lobby Controls */}
                 {status === 'LOBBY' ? (
-                    <button
-                        onClick={handleReroll}
-                        className="flex items-center gap-2 px-6 py-3 bg-gray-800 border border-gray-600 rounded-full text-gray-300 hover:text-white hover:border-white transition"
-                    >
-                        <RefreshCw size={18} /> REROLL CARD
-                    </button>
+                    !myPlayer.isLocked ? (
+                        <div className="flex gap-3 w-full max-w-sm">
+                            <button
+                                onClick={handleReroll}
+                                className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-300 hover:text-white hover:border-white transition"
+                            >
+                                <RefreshCw size={18} /> REROLL
+                            </button>
+                            <button
+                                onClick={handleLock}
+                                className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-600/30 transition text-sm font-bold"
+                            >
+                                <Lock size={18} /> LOCK CARD
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center gap-2 text-green-400 text-sm py-2 px-4 bg-green-500/10 rounded-lg border border-green-500/20 w-full max-w-sm">
+                            <CheckCircle size={16} /> CARD LOCKED & READY
+                        </div>
+                    )
                 ) : (
-                    <div className="flex items-center gap-2 text-gray-500 text-sm">
-                        <Lock size={14} /> CARD LOCKED
+                    <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
+                        <Lock size={14} /> GAME IN PROGRESS
                     </div>
                 )}
             </div>
