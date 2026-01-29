@@ -137,18 +137,18 @@ export const useGameStore = create<GameState>()(
             },
 
             joinGame: (name, playerId) => set((state) => {
-                const existingIndex = state.players.findIndex(p => p.id === playerId);
+                // 1. DANGEROUS: Aggressive Filter (ID OR Name)
+                // If ID matches OR Name matches, we treat it as the same player.
+                // This stops "Infinite S" if ID changes but Name is constant.
+                const existingIndex = state.players.findIndex(p => p.id === playerId || p.name === name);
 
-                // 1. UPDATE EXISTING (Connection Restore)
-                // If player exists, we merge new data (like name update) but keep game state.
-                // This ensures re-connections are acknowledged.
                 if (existingIndex !== -1) {
                     const updatedPlayers = [...state.players];
                     updatedPlayers[existingIndex] = {
                         ...updatedPlayers[existingIndex],
-                        name, // Update name in case it changed
-                        // We could reset 'isLocked' here if we wanted to force re-lock, 
-                        // but keeping state is usually better for reconnection.
+                        id: playerId, // Update ID to latest (if changed)
+                        name,         // Update Name (if changed)
+                        status: 'CONNECTED' // Restore status logic if we had it
                     };
                     return { players: updatedPlayers };
                 }

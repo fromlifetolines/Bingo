@@ -103,8 +103,8 @@ export const HostDashboard = () => {
 
     return (
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
-            <div className="fixed top-0 left-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V5.6 (STABLE)
+            <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
+                HOST V5.7 (NUCLEAR)
             </div>
 
             {/* Sidebar */}
@@ -133,18 +133,21 @@ export const HostDashboard = () => {
                 <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700 w-full max-w-md flex-1 flex flex-col min-h-0">
                     <div className="flex items-center gap-2 mb-4 text-neon-magenta flex-shrink-0">
                         <Users size={20} />
-                        <span className="font-bold">PLAYERS ({players.length})</span>
+                        <span className="font-bold">PLAYERS ({players.filter((v, i, a) => a.findIndex(t => t.name === v.name) === i).length})</span>
                     </div>
 
                     {/* V5.5 FORCE SCROLL WITH INLINE STYLES */}
                     <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #333' }} className="custom-scrollbar pr-2 space-y-2 flex-1">
-                        {players.map(p => (
-                            <div key={p.id} className="p-3 bg-gray-800 rounded flex justify-between items-center border-b border-gray-700">
-                                <span className="text-white font-medium">{p.name}</span>
-                                {p.isLocked && <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">READY</span>}
-                                {p.hasBingo && <span className="text-yellow-400 animate-pulse">🏆 BINGO!</span>}
-                            </div>
-                        ))}
+                        {/* V5.7 VISUAL SHIELD: Only show unique names */}
+                        {players
+                            .filter((v, i, a) => a.findIndex(t => t.name === v.name) === i)
+                            .map(p => (
+                                <div key={p.id} className="p-3 bg-gray-800 rounded flex justify-between items-center border-b border-gray-700">
+                                    <span className="text-white font-medium">{p.name}</span>
+                                    {p.isLocked && <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">READY</span>}
+                                    {p.hasBingo && <span className="text-yellow-400 animate-pulse">🏆 BINGO!</span>}
+                                </div>
+                            ))}
                     </div>
                 </div>
 

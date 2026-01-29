@@ -64,25 +64,33 @@ export const PlayerDashboard = () => {
         return pool.slice(0, 16);
     };
 
+    // V5.7 DEBOUNCE LOCK
+    const joinLock = useRef(false);
+
     const handleJoin = () => {
+        if (joinLock.current) return; // Prevent double firing
+        joinLock.current = true;
+
         const params = new URLSearchParams(window.location.search);
         const joinId = params.get('join');
 
-        if (!playerName || !joinId) return;
+        if (!playerName || !joinId) {
+            joinLock.current = false;
+            return;
+        }
 
         // V5.5 FIX: USE PERSISTENT ID
-        // Note: We use the helper logic or access from store if exposed. 
-        // Since we didn't expose current user ID in the hook return, we grab it from localStorage provided by the store logic
-        // OR we can just rely on the store's state if we exposed it. 
-        // For safety, let's grab it from localStorage 'bingo_player_id' which the store sets as main source of truth.
         const persistentId = localStorage.getItem('bingo_player_id') || crypto.randomUUID();
-        localStorage.setItem('bingo_player_id', persistentId); // Ensure it's there
-        localStorage.setItem('my_bingo_player_id', persistentId); // Sync with old key just in case
+        localStorage.setItem('bingo_player_id', persistentId);
+        localStorage.setItem('my_bingo_player_id', persistentId);
 
         // V5.2 FIX: ADD TO LOCAL STORE
         useGameStore.getState().joinGame(playerName, persistentId);
 
         joinRoom(joinId, playerName);
+
+        // Re-enable lock after 5 seconds in case of fail, but usually we just stay locked
+        setTimeout(() => { joinLock.current = false; }, 5000);
 
         // Inline Gen
         const card = generateInline();
