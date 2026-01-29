@@ -123,9 +123,12 @@ export const HostDashboard = () => {
 
                     <button
                         onClick={() => {
-                            if (confirm("START NEW GAME?")) {
-                                // BRUTE FORCE RESET: Reloads page without query params
-                                // This GUARANTEES a completely fresh Peer ID and Room ID
+                            if (confirm("⚠️ START NEW GAME?\nThis will disconnect everyone and generate a new Room ID.")) {
+                                // 1. CLEAR MEMORY to prevent "Zombie ID" (reconnecting to old session)
+                                localStorage.clear();
+                                sessionStorage.clear();
+
+                                // 2. FORCE NAVIGATE TO ROOT (Strip all params)
                                 window.location.href = window.location.origin + window.location.pathname;
                             }
                         }}
