@@ -105,7 +105,7 @@ export const HostDashboard = () => {
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
             {/* DEBUG TAG V4.1 */}
             <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V4.5 (LOCKED)
+                HOST V4.8 (FULL HISTORY)
             </div>
 
             {/* Sidebar */}
