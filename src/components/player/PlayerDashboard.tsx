@@ -8,7 +8,7 @@ import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
 
-// V3.5 MANUAL: REMOVED AUTO-GEN TO PREVENT CRASHES
+// V3.6 OFFLINE UI: NON-BLOCKING & IMMEDIATE RENDER
 export const PlayerDashboard = () => {
     const { joinRoom, connectionStatus, lockMyCard } = usePeerConnection();
     const { players, currentNumber, roomId, status, updatePlayerCard, rerollCard, isRolling } = useGameStore();
@@ -17,15 +17,30 @@ export const PlayerDashboard = () => {
 
     const [playerName, setPlayerName] = useState('');
     const [hasJoined, setHasJoined] = useState(false);
-    const [isStuck, setIsStuck] = useState(false);
     const [localRolling, setLocalRolling] = useState(false);
+
+    // Fallback ID from local storage
+    const savedId = localStorage.getItem('my_bingo_player_id');
+
+    // Resolve Player Object: Store > Local Fallback > Null
+    // This prevents the "Blocker" waiting for store sync
+    const storePlayer = players.find(p => p.id === savedId);
+
+    // Construct a temporary player object so UI can render immediately
+    const myPlayer = storePlayer || (hasJoined && savedId ? {
+        id: savedId,
+        name: playerName,
+        card: [],
+        markedIndices: [],
+        isLocked: false,
+        hasBingo: false,
+        joinedAt: Date.now()
+    } : undefined);
 
     const handleManualReset = () => {
         localStorage.clear();
         window.location.reload();
     };
-
-    const myPlayer = players.find(p => p.name === playerName);
 
     const handleJoin = () => {
         const params = new URLSearchParams(window.location.search);
@@ -37,21 +52,20 @@ export const PlayerDashboard = () => {
         localStorage.setItem('my_bingo_player_id', newId);
 
         joinRoom(joinId, playerName);
+
+        // Immediate local store init (Critical for offline feel)
         const card = generateCard();
-        // Immediate local store update
         updatePlayerCard(newId, card);
+
         setHasJoined(true);
     };
 
     const handleManualGen = () => {
-        console.log("⚡️ V3.5 MANUAL BUTTON CLICKED");
+        console.log("⚡️ V3.6 MANUAL TRIGGER");
         const newCard = generateCard();
-        let id = myPlayer?.id;
-        if (!id) id = localStorage.getItem('my_bingo_player_id') || 'temp';
-
-        // Direct update to break any loops
-        updatePlayerCard(id, newCard);
-        // Force reload via simple state toggle if needed, but store should trigger re-render
+        if (myPlayer?.id) {
+            updatePlayerCard(myPlayer.id, newCard);
+        }
     }
 
     const handleReroll = () => {
@@ -68,15 +82,13 @@ export const PlayerDashboard = () => {
     };
 
     const handleMark = (index: number) => {
-        if (!myPlayer || status !== 'PLAYING') return;
-
+        if (!myPlayer) return;
+        // Allow marking offline
         const store = useGameStore.getState();
         store.markNumber(myPlayer.id, index);
-
         const newMarked = myPlayer.markedIndices.includes(index)
             ? myPlayer.markedIndices.filter(i => i !== index)
             : [...myPlayer.markedIndices, index];
-
         checkBingo(newMarked);
     };
 
@@ -89,20 +101,11 @@ export const PlayerDashboard = () => {
         }));
     };
 
-    // Persistence Check
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const joinId = params.get('join');
         const store = useGameStore.getState();
 
-        // Stuck Timer
-        const stuckTimer = setTimeout(() => {
-            if (joinId && !store.roomId) {
-                setIsStuck(true);
-            }
-        }, 2000);
-
-        // Session Restore
         const savedId = localStorage.getItem('my_bingo_player_id');
         if (savedId) {
             const existing = store.players.find(p => p.id === savedId);
@@ -113,17 +116,12 @@ export const PlayerDashboard = () => {
                 if (targetRoom) joinRoom(targetRoom, existing.name);
             }
         }
-
-        return () => clearTimeout(stuckTimer);
     }, [joinRoom]);
-
-    // V3.5 REMOVED CRASHING AUTO-GEN useEffect
-    // Logic is now purely manual if card is missing.
 
     useEffect(() => {
         if (currentNumber) {
             setLocalRolling(false);
-            if (myPlayer) {
+            if (myPlayer && myPlayer.card && myPlayer.card.length > 0) {
                 const strNum = currentNumber.toString();
                 const idx = myPlayer.card.findIndex(n => n.toString() === strNum);
                 if (idx !== -1 && !myPlayer.markedIndices.includes(idx)) {
@@ -139,31 +137,12 @@ export const PlayerDashboard = () => {
         else setLocalRolling(false);
     }, [isRolling]);
 
-
-    if (hasJoined && !myPlayer) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4 bg-deep-gray p-4">
-                <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.5 (MANUAL)
-                </div>
-                <h2 className="text-xl font-bold text-neon-cyan animate-pulse">Connecting to Host...</h2>
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
-                {isStuck && (
-                    <div className="flex flex-col items-center animate-fade-in mt-4">
-                        <button onClick={handleManualReset} className="px-8 py-3 bg-red-500/10 border-2 border-red-500 text-red-400 rounded-full font-bold">
-                            Stuck? Tap to Retry
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    if (!hasJoined) {
+    // VIEW: LOGIN
+    if (!hasJoined && !myPlayer) {
         return (
             <div className="min-h-screen bg-deep-gray flex items-center justify-center p-4">
                 <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">
-                    PLAYER V3.5 (MANUAL)
+                    PLAYER V3.6 (OFFLINE UI)
                 </div>
                 <div className="w-full max-w-sm bg-dark-surface p-6 rounded-xl border border-gray-800 shadow-2xl space-y-4">
                     <h1 className="text-3xl font-black text-center text-white italic">NEON<span className="text-neon-cyan">BINGO</span></h1>
@@ -185,12 +164,23 @@ export const PlayerDashboard = () => {
         )
     }
 
-    // SAFETY MODE: IF NO CARD, SHOW GIANT BUTTON
-    if (!myPlayer.card || myPlayer.card.length === 0) {
+    // VIEW: DASHBOARD (Rendered immediately after join)
+    // BLOCKER REMOVED: context now allows rendering even if "connecting..."
+
+    // FAIL-SAFE MANUAL BUTTON (Prioritized if no card)
+    if (!myPlayer?.card || myPlayer.card.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-8">
-                <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.5 (MANUAL)</div>
-                <h1 className="text-3xl font-bold mb-8 text-center text-neon-cyan">Welcome, {myPlayer.name}!</h1>
+                <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold border-2 border-white">PLAYER V3.6 (OFFLINE UI)</div>
+                {/* Connection Status Indicator */}
+                <div className="absolute top-4 left-4 flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
+                    <span className="text-xs text-gray-400">{connectionStatus}</span>
+                </div>
+
+                <h1 className="text-3xl font-bold mb-8 text-center text-neon-cyan">
+                    Welcome, {myPlayer?.name || playerName}!
+                </h1>
                 <p className="mb-8 text-center text-gray-400">Click below to generate your Bingo Card.</p>
                 <button
                     onClick={handleManualGen}
@@ -207,7 +197,12 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V3.5 (MANUAL)
+                PLAYER V3.6 (OFFLINE UI)
+            </div>
+
+            {/* Connection Status Indicator */}
+            <div className="absolute top-16 left-4 flex items-center gap-2 z-10">
+                <div className={`w-3 h-3 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
             </div>
 
             {(localRolling || isRolling) && (
