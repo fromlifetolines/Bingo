@@ -42,6 +42,42 @@ interface GameState {
     checkSessionMismatch: (incomingRoomId: string | null) => void;
 }
 
+// --- NUCLEAR HARD RESET LOGIC (PERSISTENCE FIX) ---
+try {
+    const params = new URLSearchParams(window.location.search);
+    const joinId = params.get('join');
+    const storageData = localStorage.getItem('bingo-storage');
+
+    if (joinId && storageData) {
+        const parsed = JSON.parse(storageData);
+        // "state" is the default wrapper for zustand persist
+        const storedRoomId = parsed.state?.roomId;
+
+        if (storedRoomId && storedRoomId !== joinId) {
+            console.warn('[CRITICAL] Room ID Mismatch detected (URL vs LocalStorage).');
+            console.warn(`URL: ${joinId} | Stored: ${storedRoomId}`);
+            console.warn('Initiating NUCLEAR HARD RESET to prevent deadlock...');
+
+            localStorage.clear();
+
+            // Reload with the same URL (which still has ?join=...)
+            // But now localStorage is empty, so it will be a clean join.
+            window.location.reload();
+
+            // Throw error to halt further script execution immediately
+            throw new Error('Halting execution for hard reset...');
+        }
+    }
+} catch (e) {
+    // If it's our intention to halt, log it. 
+    if ((e as Error).message === 'Halting execution for hard reset...') {
+        console.log('Resetting...');
+    } else {
+        console.error('Error during persistence check:', e); // Non-blocking if JSON parse fails
+    }
+}
+// --------------------------------------------------    
+
 export const useGameStore = create<GameState>()(
     persist(
         (set, get) => ({
