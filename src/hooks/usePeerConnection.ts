@@ -9,6 +9,7 @@ type Payload =
     | { type: 'PLAYER_JOIN'; payload: { id: string; name: string } }
     | { type: 'PLAYER_BINGO'; payload: string }
     | { type: 'PLAYER_LOCK'; payload: string } // New: Player sends this to Host
+    | { type: 'GAME_STARTED' } // New: Host notifies game start
     | { type: 'RESET_GAME' };
 
 export const usePeerConnection = () => {
@@ -17,7 +18,7 @@ export const usePeerConnection = () => {
         setRoomId,
         joinGame,
         drawNumber: storeDrawNumber,
-        drawnNumbers, // to sync new players
+        drawnNumbers,
         currentNumber
     } = useGameStore();
 
@@ -26,11 +27,8 @@ export const usePeerConnection = () => {
     const [connectionStatus, setConnectionStatus] = useState<'DISCONNECTED' | 'CONNECTING' | 'CONNECTED'>('DISCONNECTED');
 
     const handleData = (data: Payload) => {
-        console.log('Received:', data);
-
         switch (data.type) {
             case 'PLAYER_JOIN':
-                // Host received player join
                 if (role === 'HOST') {
                     joinGame(data.payload.name, data.payload.id);
                 }
@@ -42,20 +40,26 @@ export const usePeerConnection = () => {
                 }
                 break;
 
+            case 'GAME_STARTED':
+                if (role === 'PLAYER') {
+                    useGameStore.getState().setGameStatus('PLAYING');
+                    const myId = localStorage.getItem('my_bingo_player_id');
+                    if (myId) useGameStore.getState().lockCard(myId);
+                }
+                break;
+
             case 'ROLLING':
-                // Players show rolling state
                 if (role === 'PLAYER') {
                     useGameStore.getState().setRolling(true);
                 }
                 break;
 
             case 'DRAW_NUMBER':
-                // Player received number
                 if (role === 'PLAYER') {
                     useGameStore.setState((state) => ({
                         drawnNumbers: [...state.drawnNumbers, data.payload],
                         currentNumber: data.payload,
-                        isRolling: false // Stop rolling when number arrives
+                        isRolling: false
                     }));
                 }
                 break;
@@ -65,7 +69,7 @@ export const usePeerConnection = () => {
                     useGameStore.setState(() => ({
                         drawnNumbers: data.payload.drawnNumbers,
                         currentNumber: data.payload.currentNumber,
-                        isRolling: false
+                        isRolling: false,
                     }));
                 }
                 break;
@@ -76,12 +80,11 @@ export const usePeerConnection = () => {
         }
     };
 
-    // HOST: Create Room
     const createRoom = () => {
         if (peerRef.current) return;
 
         setConnectionStatus('CONNECTING');
-        const peer = new Peer(); // Auto-generate ID
+        const peer = new Peer();
         peerRef.current = peer;
 
         peer.on('open', (id) => {
@@ -94,25 +97,27 @@ export const usePeerConnection = () => {
             connectionsRef.current.push(conn);
             console.log('New connection:', conn.peer);
 
-            conn.on('data', (data: any) => {
-                handleData(data);
-            });
+            conn.on('data', (data: any) => handleData(data));
 
-            // Sync initial state to new player
             conn.on('open', () => {
+                const state = useGameStore.getState();
                 conn.send({
                     type: 'SYNC_STATE',
-                    payload: { drawnNumbers, currentNumber }
+                    payload: {
+                        drawnNumbers: state.drawnNumbers,
+                        currentNumber: state.currentNumber,
+                    }
                 });
+                if (state.status === 'PLAYING') {
+                    conn.send({ type: 'GAME_STARTED' });
+                }
             });
         });
     };
 
-    // PLAYER: Join Room
     const joinRoom = (hostId: string, playerName: string) => {
-        // Safe refresh: if peer exists, it might be in an old state. Destroy it.
         if (peerRef.current) {
-            console.log('Destroying old peer before joining new room...');
+            console.log('Destroying old peer...');
             peerRef.current.destroy();
             peerRef.current = null;
         }
@@ -123,44 +128,33 @@ export const usePeerConnection = () => {
 
         peer.on('open', (id) => {
             console.log('My Player ID:', id);
-            console.log(`Attempting to connect to Host: ${hostId}`);
-
-            // Connect with reliable serialization
             const conn = peer.connect(hostId, {
                 serialization: 'json',
                 reliable: true
             });
-
             connectionsRef.current = [conn];
 
             conn.on('open', () => {
-                console.log('✅ Connection to Host OPEN!');
+                console.log('Connected to Host');
                 setConnectionStatus('CONNECTED');
                 setRoomId(hostId);
-                // Send join event
                 conn.send({ type: 'PLAYER_JOIN', payload: { id, name: playerName } });
-                // Local join
                 joinGame(playerName, id);
             });
 
-            conn.on('data', (data: any) => {
-                handleData(data);
-            });
-
+            conn.on('data', (data: any) => handleData(data));
             conn.on('error', (err) => {
                 console.error('Connection Error:', err);
                 setConnectionStatus('DISCONNECTED');
             });
-
             conn.on('close', () => {
-                console.warn('Connection to Host CLOSED.');
+                console.warn('Connection Closed');
                 setConnectionStatus('DISCONNECTED');
             });
         });
 
         peer.on('error', (err) => {
             console.error('Peer Fatal Error:', err);
-            // If ID is taken (rare with random) or network fails
             setConnectionStatus('DISCONNECTED');
         });
     };
@@ -171,18 +165,14 @@ export const usePeerConnection = () => {
         });
     };
 
-    // Wrapper for Host actions that also need to broadcast
     const hostDrawNumber = async () => {
-        // 1. Broadcast Rolling immediately
         if (useGameStore.getState().status !== 'PLAYING') return;
 
         broadcast({ type: 'ROLLING' });
-        useGameStore.getState().setRolling(true); // Local update
+        useGameStore.getState().setRolling(true);
 
-        // 2. Wait for animation (2.5s)
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // 3. Draw and Broadcast
         storeDrawNumber();
         const state = useGameStore.getState();
         if (state.currentNumber) {
@@ -191,10 +181,13 @@ export const usePeerConnection = () => {
         useGameStore.getState().setRolling(false);
     };
 
+    const startGame = () => {
+        useGameStore.getState().startGame();
+        broadcast({ type: 'GAME_STARTED' });
+    };
+
     const lockMyCard = (playerId: string) => {
-        // Player locks themselves
         useGameStore.getState().lockCard(playerId);
-        // Notify host
         if (peerRef.current && connectionsRef.current[0]) {
             connectionsRef.current[0].send({ type: 'PLAYER_LOCK', payload: playerId });
         }
@@ -208,10 +201,6 @@ export const usePeerConnection = () => {
         connectionsRef.current = [];
         setConnectionStatus('DISCONNECTED');
         useGameStore.getState().resetGame();
-        // Cannot broadcast after destroy, but maybe we should broadcast first?
-        // Actually, if we destroy, we can't broadcast.
-        // But reset is usually for the HOST starting over a SESSION, or a hard reset.
-        // If it's a hard reset, destroying is correct.
     };
 
     return {
@@ -219,6 +208,7 @@ export const usePeerConnection = () => {
         joinRoom,
         connectionStatus,
         hostDrawNumber,
+        startGame,
         lockMyCard,
         reset
     };

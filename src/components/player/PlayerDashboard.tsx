@@ -47,8 +47,19 @@ export const PlayerDashboard = () => {
                 if (targetRoom) joinRoom(targetRoom, existing.name);
             }
         }
+
+        // Fix 1: Auto-Generate Card on Join if missing (for fresh joins)
+        // Wait check a bit to allow hydration
+        setTimeout(() => {
+            const playerState = useGameStore.getState().players.find(p => p.id === savedId);
+            if (playerState && playerState.card.length === 0) {
+                const newCard = generateCard();
+                updatePlayerCard(playerState.id, newCard);
+            }
+        }, 500);
+
         return () => clearTimeout(stuckTimer);
-    }, [joinRoom]);
+    }, [joinRoom, generateCard, updatePlayerCard]);
 
     const handleManualReset = () => {
         // Immediate Nuclear Reset

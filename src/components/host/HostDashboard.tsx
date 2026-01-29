@@ -9,8 +9,8 @@ import { RecentNumbers } from './RecentNumbers';
 import { BrandFooter } from '../shared/BrandFooter';
 
 export const HostDashboard = () => {
-    const { createRoom, hostDrawNumber, connectionStatus } = usePeerConnection();
-    const { roomId, currentNumber, drawnNumbers, players, status, startGame } = useGameStore();
+    const { createRoom, hostDrawNumber, connectionStatus, startGame } = usePeerConnection();
+    const { roomId, currentNumber, drawnNumbers, players, status } = useGameStore();
     const { playPop, playHorn, announceNumber } = useSoundEffects();
 
     useEffect(() => {
@@ -19,11 +19,11 @@ export const HostDashboard = () => {
 
     useEffect(() => {
         if (currentNumber && status === 'PLAYING') {
-            // Delay announce to sync with slot animation finish (approx 2.5s)
+            // Delay announce to sync with slot animation finish (approx 3.0s)
             setTimeout(() => {
                 playPop(); // This is the 'ting'
                 announceNumber(currentNumber);
-            }, 2500);
+            }, 3000);
         }
     }, [currentNumber, status, playPop, announceNumber]);
 
@@ -33,16 +33,7 @@ export const HostDashboard = () => {
     }, [players, playHorn]);
 
     const handleStartGame = () => {
-        startGame();
-        // Should broadcast 'GAME_STARTED' or 'SYNC_STATE' here ideally via store subscription or direct call
-        // The store update will be broadcasted by usePeerConnection's state listener if we set one up, 
-        // OR we need to trigger broadcast manually. 
-        // Since usePeerConnection handles 'DRAW_NUMBER', we need to make sure 'START_GAME' is handled there too.
-        // For now, let's assume the players check the status sync.
-        // Actually, we should call a method in usePeerConnection to ensure broadcast.
-        // But usePeerConnection doesn't expose a 'broadcastState' easily. 
-        // We will rely on the fact that `startGame` updates the store, and we should create a triggered broadcast.
-        // To be safe, we can add a useEffect observing 'status' in usePeerConnection to broadcast.
+        startGame(); // Now strictly through PeerConnection hook to ensure broadcast
     };
 
     return (
