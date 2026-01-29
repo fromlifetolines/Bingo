@@ -6,4 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: '/Bingo/',
+  define: {
+    global: 'window', // Fix for PeerJS crashing in production
+  },
 })
