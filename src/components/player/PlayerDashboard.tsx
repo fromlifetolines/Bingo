@@ -192,11 +192,20 @@ export const PlayerDashboard = () => {
     }, [joinRoom]);
 
     // V4.5 Local History (The Permanent Notebook)
-    // V4.7 Stateless History (Crash Prevention)
-    // We use a REF to store history so it doesn't trigger effect loops.
+    // V6.1: PERMANENT HIGHLIGHT ENGINE
     const markedRef = useRef<number[]>([]);
-    // Manual re-render trigger
     const [, forceUpdate] = useState(0);
+
+    // V6.1: Force Store Sync (Fixes "Fallback Player" Issue)
+    useEffect(() => {
+        if (!storePlayer && hasJoined && savedId && playerName) {
+            console.warn("⚠️ V6.1: Player missing from store. Re-injecting...");
+            useGameStore.getState().joinGame(playerName, savedId);
+            if (localCardNumbers.length > 0) {
+                useGameStore.getState().updatePlayerCard(savedId, localCardNumbers);
+            }
+        }
+    }, [storePlayer, hasJoined, savedId, playerName, localCardNumbers]);
 
     useEffect(() => {
         if (currentNumber) {
@@ -205,24 +214,29 @@ export const PlayerDashboard = () => {
                 const strNum = currentNumber.toString();
                 const idx = localCardNumbers.findIndex(n => n.toString() === strNum);
 
-                // V4.7 STATELESS UPDATE
                 if (idx !== -1) {
+                    // V6.1: ALWAYS MARK (Idempotent)
+                    // We use markedRef to avoid infinite effect loops, but we trust the store action to be safe (Add-Only).
                     if (!markedRef.current.includes(idx)) {
-                        console.log("⚡️ V4.7 ADDING TO REF (Safe):", idx);
+                        console.log("⚡️ V6.1 PERMANENT MARK:", idx);
                         markedRef.current.push(idx);
-
-                        // ONE Render Trigger
                         forceUpdate(n => n + 1);
 
-                        // Sync to store silently
+                        if (myPlayer) {
+                            // Use markTile (Add Only)
+                            useGameStore.getState().markTile(myPlayer.id, idx);
+                            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                        }
+                    } else {
+                        // Double check store just in case (Persistence Insurance)
                         if (myPlayer && !myPlayer.markedIndices.includes(idx)) {
-                            useGameStore.getState().markNumber(myPlayer.id, idx);
+                            useGameStore.getState().markTile(myPlayer.id, idx);
                         }
                     }
                 }
             }
         }
-    }, [currentNumber, localCardNumbers]); // Removed myPlayer dependency to be safer
+    }, [currentNumber, localCardNumbers]); // Removed myPlayer dep to avoid resizing loops, handled inside via ref/getState
 
     useEffect(() => {
         // Sync Visuals
@@ -301,7 +315,7 @@ export const PlayerDashboard = () => {
                             HOW <span className="text-white mix-blend-normal">BINGO</span>
                         </h1>
                         <div className="text-xs font-mono text-white/50 flex items-center gap-2">
-                            <span>PLAYER V6.0 (FLUID)</span>
+                            <span>PLAYER V6.1 (PERMANENT)</span>
                             <div className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
                         </div>
                     </div>

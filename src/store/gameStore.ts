@@ -195,6 +195,15 @@ export const useGameStore = create<GameState>()(
                 })
             })),
 
+            // V6.1 PERMANENT MARK (No Toggle)
+            markTile: (playerId, numberIndex) => set((state) => ({
+                players: state.players.map(p => {
+                    if (p.id !== playerId) return p;
+                    if (p.markedIndices.includes(numberIndex)) return p; // Already marked
+                    return { ...p, markedIndices: [...p.markedIndices, numberIndex] };
+                })
+            })),
+
             checkSessionMismatch: (incomingRoomId) => {
                 const state = get();
                 // If we are trying to join a SPECIFIC room (incomingRoomId) 
