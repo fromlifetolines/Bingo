@@ -96,7 +96,6 @@ export const LotteryDrum = ({ currentNumber }: Props) => {
                                 animate={{ scale: 1, opacity: 1 }}
                                 className="flex flex-col items-center"
                             >
-                                <span className="text-4xl font-bold uppercase opacity-60 mb-2">{getLetter(displayNumber)}</span>
                                 <span className="text-9xl font-black dropping-shadow-neon">{displayNumber}</span>
                             </motion.div>
                         ) : (

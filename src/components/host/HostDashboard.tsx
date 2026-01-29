@@ -78,21 +78,21 @@ export const HostDashboard = () => {
                     setIsRolling(false);
                     try { playDingSound(); } catch (e) { }
 
-                    // 6. BROADCAST (Delayed by 200ms AFTER Host reveal)
-                    // V4.9: SPEED MODE (1s Anim + 200ms Network)
+                    // 6. BROADCAST (Delayed by 800ms AFTER Host reveal)
+                    // V5.0: GOLD MASTER (1s Anim + 800ms Safety Buffer)
                     setTimeout(() => {
                         const freshBroadcast = useGameStore.getState().broadcastEvent;
                         if (freshBroadcast) {
                             freshBroadcast({ type: 'DRAW_NUMBER', payload: newNum });
                             announceNumber(newNum);
                         }
-                    }, 200);
+                    }, 800);
                 } catch (innerError) {
                     console.error("Gen failed", innerError);
                     setIsRolling(false);
                     useGameStore.getState().setRolling(false);
                 }
-            }, 1000); // V4.9: Reduced to 1.0s
+            }, 1000); // V5.0: Animation takes 1s
 
         } catch (error) {
             console.error("Draw setup failed", error);
