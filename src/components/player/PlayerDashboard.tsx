@@ -109,6 +109,10 @@ export const PlayerDashboard = () => {
     const handleLock = () => {
         if (!myPlayer) return;
         if (window.confirm("Lock this card? You won't be able to reroll.")) {
+            // 1. UPDATE STATE IMMEDIATELY (Fixes UI lag)
+            useGameStore.getState().lockCard(myPlayer.id);
+
+            // 2. BROADCAST TO HOST
             lockMyCard(myPlayer.id);
         }
     };
@@ -302,8 +306,8 @@ export const PlayerDashboard = () => {
                             </button>
                         </div>
                     ) : (
-                        <div className="flex items-center justify-center gap-2 text-green-400 text-sm py-2 px-4 bg-green-500/10 rounded-lg border border-green-500/20 w-full max-w-sm">
-                            <CheckCircle size={16} /> CARD LOCKED & READY
+                        <div className="flex items-center justify-center gap-2 text-green-400 font-bold py-4 px-4 bg-green-900/50 border border-green-500 rounded-xl w-full max-w-sm animate-pulse shadow-[0_0_15px_rgba(74,222,128,0.2)]">
+                            🔒 CARD LOCKED - WAITING FOR HOST
                         </div>
                     )
                 ) : (
