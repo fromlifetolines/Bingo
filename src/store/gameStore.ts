@@ -10,6 +10,7 @@ export interface Player {
     card: number[]; // Flat array of 16 numbers
     markedIndices: number[];
     hasBingo: boolean;
+    isLocked: boolean;
 }
 
 interface GameState {
@@ -18,6 +19,7 @@ interface GameState {
     roomId: string | null;
     drawnNumbers: number[];
     currentNumber: number | null;
+    isRolling: boolean;
     players: Player[];
 
     // Actions
@@ -25,6 +27,7 @@ interface GameState {
     setRoomId: (id: string) => void;
     startGame: () => void;
     resetGame: () => void;
+    setRolling: (isRolling: boolean) => void;
 
     // Host Actions
     drawNumber: () => void;
@@ -34,7 +37,9 @@ interface GameState {
     joinGame: (name: string, playerId: string) => void;
     updatePlayerCard: (playerId: string, card: number[]) => void;
     rerollCard: (playerId: string, newCard: number[]) => void;
+    lockCard: (playerId: string) => void;
     markNumber: (playerId: string, numberIndex: number) => void;
+    checkSessionMismatch: (incomingRoomId: string | null) => void;
 }
 
 export const useGameStore = create<GameState>()(
@@ -45,12 +50,14 @@ export const useGameStore = create<GameState>()(
             roomId: null,
             drawnNumbers: [],
             currentNumber: null,
+            isRolling: false,
             players: [],
 
             setRole: (role) => set({ role }),
             setRoomId: (roomId) => set({ roomId }),
 
             setGameStatus: (status) => set({ status }),
+            setRolling: (isRolling) => set({ isRolling }),
 
             startGame: () => set({ status: 'PLAYING', drawnNumbers: [], currentNumber: null }),
 
@@ -58,6 +65,7 @@ export const useGameStore = create<GameState>()(
                 status: 'LOBBY',
                 drawnNumbers: [],
                 currentNumber: null,
+                isRolling: false,
                 players: []
             }),
 
@@ -87,7 +95,8 @@ export const useGameStore = create<GameState>()(
                         name,
                         card: [],
                         markedIndices: [],
-                        hasBingo: false
+                        hasBingo: false,
+                        isLocked: false
                     }]
                 };
             }),
@@ -104,6 +113,12 @@ export const useGameStore = create<GameState>()(
                 )
             })),
 
+            lockCard: (playerId) => set((state) => ({
+                players: state.players.map(p =>
+                    p.id === playerId ? { ...p, isLocked: true } : p
+                )
+            })),
+
             markNumber: (playerId, numberIndex) => set((state) => ({
                 players: state.players.map(p => {
                     if (p.id !== playerId) return p;
@@ -114,19 +129,32 @@ export const useGameStore = create<GameState>()(
                     return { ...p, markedIndices: newMarked };
                 })
             })),
+
+            checkSessionMismatch: (incomingRoomId) => {
+                const state = get();
+                // If we are trying to join a SPECIFIC room (incomingRoomId) 
+                // AND we have a stored room ID that is DIFFERENT
+                if (incomingRoomId && state.roomId && state.roomId !== incomingRoomId) {
+                    console.log('Detected Room Mismatch: Clearing Session');
+                    // Wipe everything for a clean slate
+                    set({
+                        status: 'LOBBY',
+                        role: null,
+                        roomId: null,
+                        drawnNumbers: [],
+                        currentNumber: null,
+                        isRolling: false,
+                        players: []
+                    });
+                }
+            }
         }),
         {
-            name: 'bingo-storage', // name of the item in the storage (must be unique)
-            storage: createJSONStorage(() => localStorage), // (optional) by default, 'localStorage' is used
+            name: 'bingo-storage',
+            storage: createJSONStorage(() => localStorage),
             partialize: (state) => ({
-                // Only persist these fields to recover session
                 role: state.role,
                 roomId: state.roomId,
-                // players: state.players, // Maybe risky to persist all players if host? 
-                // ideally host persists everything, player persists only self details?
-                // For simplicity, persist all for now, assuming peer sync handles the rest on reconnect.
-                // Actually, if we persist 'players', we might have stale data. 
-                // But we need it for 'reconnect as existing player'.
                 players: state.players
             }),
         }

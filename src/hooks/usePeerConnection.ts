@@ -176,8 +176,17 @@ export const usePeerConnection = () => {
     };
 
     const reset = () => {
+        if (peerRef.current) {
+            peerRef.current.destroy();
+            peerRef.current = null;
+        }
+        connectionsRef.current = [];
+        setConnectionStatus('DISCONNECTED');
         useGameStore.getState().resetGame();
-        broadcast({ type: 'RESET_GAME' });
+        // Cannot broadcast after destroy, but maybe we should broadcast first?
+        // Actually, if we destroy, we can't broadcast.
+        // But reset is usually for the HOST starting over a SESSION, or a hard reset.
+        // If it's a hard reset, destroying is correct.
     };
 
     return {

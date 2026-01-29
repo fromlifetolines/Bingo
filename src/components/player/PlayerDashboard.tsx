@@ -16,20 +16,47 @@ export const PlayerDashboard = () => {
 
     const [playerName, setPlayerName] = useState('');
     const [hasJoined, setHasJoined] = useState(false);
+    const [isStuck, setIsStuck] = useState(false);
 
     // Persistence Check on Mount
     useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const joinId = params.get('join');
+
+        // Check for mismatch BEFORE trying to restore
+        useGameStore.getState().checkSessionMismatch(joinId);
+
+        // Stuck Timer
+        const stuckTimer = setTimeout(() => {
+            // If we have a join ID but no roomId in store (meaning we haven't connected yet)
+            if (joinId && !useGameStore.getState().roomId) {
+                setIsStuck(true);
+            }
+        }, 5000);
+
         const storedPlayers = useGameStore.getState().players;
         const savedId = localStorage.getItem('my_bingo_player_id');
+
         if (savedId) {
             const existing = storedPlayers.find(p => p.id === savedId);
             if (existing) {
                 setPlayerName(existing.name);
                 setHasJoined(true);
-                if (roomId) joinRoom(roomId, existing.name);
+                // Important: Use the joinId from URL if available and store was cleared, 
+                // OR use the one from store if it matched.
+                const targetRoom = useGameStore.getState().roomId || joinId;
+                if (targetRoom) joinRoom(targetRoom, existing.name);
             }
         }
-    }, [roomId, joinRoom]);
+        return () => clearTimeout(stuckTimer);
+    }, [joinRoom]);
+
+    const handleManualReset = () => {
+        if (window.confirm("This will clear your local data and reload. OK?")) {
+            localStorage.clear();
+            window.location.reload();
+        }
+    };
 
     const myPlayer = players.find(p => p.name === playerName);
 
@@ -60,7 +87,9 @@ export const PlayerDashboard = () => {
 
     const handleLock = () => {
         if (!myPlayer) return;
-        if (confirm("Lock this card? You won't be able to reroll.")) {
+        // Native confirm is fine, but let's make sure linter doesn't complain
+        const confirmed = window.confirm("Lock this card? You won't be able to reroll.");
+        if (confirmed) {
             lockMyCard(myPlayer.id);
         }
     };
@@ -115,7 +144,23 @@ export const PlayerDashboard = () => {
         )
     }
 
-    if (!myPlayer) return <div className="text-white text-center mt-20">Loading...</div>;
+    if (!myPlayer) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen text-white gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
+                <div className="text-gray-400">Connecting to Game...</div>
+
+                {isStuck && (
+                    <button
+                        onClick={handleManualReset}
+                        className="mt-4 px-6 py-2 bg-red-500/10 border border-red-500 text-red-400 rounded-full text-sm hover:bg-red-500/20 transition"
+                    >
+                        Stuck? Click to Reset
+                    </button>
+                )}
+            </div>
+        );
+    }
 
     const isBingo = checkBingo(myPlayer.markedIndices);
 
