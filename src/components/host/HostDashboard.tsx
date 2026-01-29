@@ -79,6 +79,7 @@ export const HostDashboard = () => {
                     try { playDingSound(); } catch (e) { }
 
                     // 6. BROADCAST LATER (500ms Delay to prevent spoiler)
+                    // V4.4: STRICT DELAY
                     setTimeout(() => {
                         const freshBroadcast = useGameStore.getState().broadcastEvent;
                         if (freshBroadcast) {
@@ -91,7 +92,7 @@ export const HostDashboard = () => {
                     setIsRolling(false);
                     useGameStore.getState().setRolling(false);
                 }
-            }, 2500);
+            }, 3000); // V4.4: Extended to 3.0s
 
         } catch (error) {
             console.error("Draw setup failed", error);
@@ -104,7 +105,7 @@ export const HostDashboard = () => {
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
             {/* DEBUG TAG V4.1 */}
             <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V4.3 (NO SPOILERS)
+                HOST V4.4 (DELAYED)
             </div>
 
             {/* Sidebar */}

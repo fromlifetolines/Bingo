@@ -160,9 +160,16 @@ export const PlayerDashboard = () => {
             if (localCardNumbers.length > 0) {
                 const strNum = currentNumber.toString();
                 const idx = localCardNumbers.findIndex(n => n.toString() === strNum);
-                if (idx !== -1 && myPlayer && !myPlayer.markedIndices.includes(idx)) {
-                    handleMark(idx);
-                    if (navigator.vibrate) navigator.vibrate(200);
+
+                // V4.4 PERMANENT FIX: Save to store immediately
+                if (idx !== -1) {
+                    // Check if already marked to avoid loops
+                    if (myPlayer && !myPlayer.markedIndices.includes(idx)) {
+                        console.log("⚡️ V4.4 AUTO-SAVING MATCH:", idx);
+                        const store = useGameStore.getState();
+                        store.markNumber(myPlayer.id, idx);
+                        if (navigator.vibrate) navigator.vibrate(200);
+                    }
                 }
             }
         }
@@ -233,7 +240,7 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-green-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V4.3 (VISUAL FIX)
+                PLAYER V4.4 (PERMANENT)
             </div>
 
             {/* Connection Status Indicator */}
