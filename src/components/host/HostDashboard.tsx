@@ -78,21 +78,21 @@ export const HostDashboard = () => {
                     setIsRolling(false);
                     try { playDingSound(); } catch (e) { }
 
-                    // 6. BROADCAST (Delayed by 500ms AFTER Host reveal)
-                    // V4.5: STRICT 4.5s TOTAL DELAY (4000ms Anim + 500ms Network)
+                    // 6. BROADCAST (Delayed by 200ms AFTER Host reveal)
+                    // V4.9: SPEED MODE (1s Anim + 200ms Network)
                     setTimeout(() => {
                         const freshBroadcast = useGameStore.getState().broadcastEvent;
                         if (freshBroadcast) {
                             freshBroadcast({ type: 'DRAW_NUMBER', payload: newNum });
                             announceNumber(newNum);
                         }
-                    }, 500);
+                    }, 200);
                 } catch (innerError) {
                     console.error("Gen failed", innerError);
                     setIsRolling(false);
                     useGameStore.getState().setRolling(false);
                 }
-            }, 4000); // V4.5: Extended to 4.0s (The 4-Second Lock)
+            }, 1000); // V4.9: Reduced to 1.0s
 
         } catch (error) {
             console.error("Draw setup failed", error);
@@ -105,7 +105,7 @@ export const HostDashboard = () => {
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
             {/* DEBUG TAG V4.1 */}
             <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V4.8 (FULL HISTORY)
+                HOST V4.9 (SPEED 1s)
             </div>
 
             {/* Sidebar */}
