@@ -3,19 +3,20 @@ import { motion } from 'framer-motion';
 interface Props {
     number: number;
     isMarked: boolean;
-    onMark: () => void;
+    onClick?: () => void; // V6.0 Added optional onClick
 }
 
-export const BingoCell = ({ number, isMarked, onMark }: Props) => {
+export const BingoCell = ({ number, isMarked, onClick }: Props) => {
     return (
         <motion.div
-            whileTap={{ scale: 0.9 }}
-            onClick={onMark}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onClick}
             className={`
-                aspect-square rounded-xl flex items-center justify-center text-xl font-bold cursor-pointer transition-all border-2
+                aspect-square flex items-center justify-center rounded-xl text-2xl font-black relative overflow-hidden cursor-pointer
                 ${isMarked
-                    ? 'bg-yellow-400 border-yellow-500 text-black shadow-[0_0_15px_rgba(250,204,21,0.6)] scale-105 z-10' // Fix 2: Permanent High-Contrast
-                    : 'bg-dark-surface border-gray-700 text-gray-300 hover:border-neon-cyan hover:text-white hover:shadow-[0_0_10px_rgba(0,243,255,0.2)]'
+                    ? 'bg-gradient-to-br from-neon-magenta to-purple-600 text-white shadow-[0_0_15px_rgba(255,0,255,0.5)] border-2 border-white'
+                    : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-white'
                 }
             `}
         >

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Trophy, RefreshCw, Lock, CheckCircle } from 'lucide-react';
+import { Trophy, Lock, RotateCcw, PartyPopper, Ban } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useGameStore } from '../../store/gameStore';
 import { usePeerConnection } from '../../hooks/usePeerConnection';
@@ -7,6 +7,7 @@ import { useBingoLogic } from '../../hooks/useBingoLogic';
 import { useSoundEffects } from '../../hooks/useSoundEffects';
 import { BingoCard } from './BingoCard';
 import { BrandFooter } from '../shared/BrandFooter';
+import FluidCanvas, { FluidCanvasRef } from '../effects/FluidCanvas';
 
 // V4.0 SYNC: ANIMATION AWARE
 export const PlayerDashboard = () => {
@@ -153,6 +154,21 @@ export const PlayerDashboard = () => {
         }));
     };
 
+    // V6.0 FLUID INTERACTION
+    const fluidRef = useRef<FluidCanvasRef>(null);
+
+    const handleSplat = (x: number, y: number, color: number[]) => {
+        if (fluidRef.current) {
+            // Multiple splats for richness
+            fluidRef.current.splat(x, y, (Math.random() - 0.5) * 0.01, (Math.random() - 0.5) * 0.01, color);
+        }
+    };
+
+    // V6.0 MOBILE OPTIMIZATION
+    // We can pass a prop to FluidCanvas for resolution?
+    // For now, FluidCanvas has fixed config. Let's just avoid heavy splashes on mobile if needed.
+    // Or we rely on FluidCanvas internal resolution (128).
+
     // Init Logic
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -246,7 +262,7 @@ export const PlayerDashboard = () => {
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-8">
                 {/* Connection Status Indicator */}
                 <div className="absolute top-4 left-4 flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
+                    <div className={`w - 3 h - 3 rounded - full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'} `}></div>
                     <span className="text-xs text-gray-400">{connectionStatus}</span>
                 </div>
 
@@ -270,15 +286,31 @@ export const PlayerDashboard = () => {
     console.log("Current Lock State:", myPlayer?.isLocked);
 
     return (
-        <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
-            <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V5.3 (FIXED)
+        <div className="min-h-screen bg-deep-gray text-white flex flex-col relative overflow-hidden">
+            {/* V6.0 FLUID BACKGROUND */}
+            <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen">
+                <FluidCanvas ref={fluidRef} />
             </div>
 
-            {/* Connection Status Indicator */}
-            <div className="absolute top-16 left-4 flex items-center gap-2 z-10">
-                <div className={`w-3 h-3 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
-            </div>
+            {/* Header */}
+            <header className="bg-deep-gray/80 backdrop-blur-md p-4 sticky top-0 z-40 border-b border-white/10 shadow-lg">
+                <div className="max-w-md mx-auto flex justify-between items-center">
+                    <div>
+                        {/* FLUID TITLE EFFECT: Text is Transparent Stroked, getting fill from background via mix-blend */}
+                        <h1 className="text-3xl font-black italic tracking-tighter text-transparent bg-clip-text bg-white/20 mix-blend-overlay drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] border-white">
+                            HOW <span className="text-white mix-blend-normal">BINGO</span>
+                        </h1>
+                        <div className="text-xs font-mono text-white/50 flex items-center gap-2">
+                            <span>PLAYER V6.0 (FLUID)</span>
+                            <div className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Draw</span>
+                        <div className="text-4xl font-black text-neon-magenta leading-none">{currentNumber || '--'}</div>
+                    </div>
+                </div>
+            </header>
 
             {(localRolling || isRolling) && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center flex-col">
@@ -287,71 +319,70 @@ export const PlayerDashboard = () => {
                 </div>
             )}
 
-            <div className="sticky top-0 bg-dark-surface/90 backdrop-blur border-b border-gray-800 p-4 z-20 flex justify-between items-center">
-                <div>
-                    <h2 className="font-bold text-neon-cyan">{myPlayer?.name || playerName}</h2>
-                    <span className="text-xs text-gray-400">{status} MODE</span>
-                </div>
-                <div className="text-right">
-                    <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Draw</span>
-                    <div className="text-4xl font-black text-neon-magenta leading-none">{currentNumber || '--'}</div>
-                </div>
-            </div>
-
             {status === 'LOBBY' && (
                 <div className="bg-yellow-500/10 p-2 text-center text-yellow-500 text-xs font-bold border-b border-yellow-500/20">
                     {myPlayer?.isLocked ? "READY TO START" : "FINALIZE YOUR CARD"}
                 </div>
             )}
 
-            <div className="p-4 flex flex-col items-center gap-6 mt-4">
-                <BingoCard
-                    numbers={displayCard}
-                    markedIndices={[...new Set([...(myPlayer?.markedIndices || []), ...markedRef.current])]} // V4.7 Use Ref
-                    currentNumber={currentNumber}
-                    onMark={handleMark}
-                />
+            {/* GAME AREA */}
+            <main className="flex-1 overflow-y-auto pb-32">
+                <div className="flex-1 flex flex-col items-center justify-center p-4 relative z-10 w-full max-w-md mx-auto">
+                    <BingoCard
+                        numbers={localCardNumbers}
+                        markedIndices={myPlayer?.markedIndices || []}
+                        onMark={handleMark}
+                        currentNumber={currentNumber}
+                        onSplat={(x, y, color) => handleSplat(x, y, color)}
+                    />
+                </div>
 
-                {status === 'LOBBY' ? (
-                    !myPlayer?.isLocked ? (
-                        <div className="flex gap-3 w-full max-w-sm">
-                            <button
-                                onClick={handleReroll}
-                                className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-300 hover:text-white hover:border-white transition"
-                            >
-                                <RefreshCw size={18} /> REROLL
-                            </button>
-                            <button
-                                onClick={handleLock}
-                                className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-600/30 transition text-sm font-bold"
-                            >
-                                <Lock size={18} /> LOCK CARD
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex items-center justify-center gap-2 text-green-400 font-bold py-4 px-4 bg-green-900/50 border border-green-500 rounded-xl w-full max-w-sm animate-pulse shadow-[0_0_15px_rgba(74,222,128,0.2)]">
-                            🔒 CARD LOCKED - WAITING FOR HOST
-                        </div>
-                    )
-                ) : (
-                    <div className="flex items-center justify-center gap-2 text-gray-500 text-sm">
-                        <Lock size={14} /> GAME IN PROGRESS
+                {/* CONTROLS */}
+                {!myPlayer?.isLocked && status === 'LOBBY' && (
+                    <div className="flex gap-4 max-w-sm mx-auto p-4">
+                        <button
+                            onClick={handleReroll}
+                            className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-4 rounded-xl flex flex-col items-center gap-2 border border-gray-700 transition-all border-b-4 border-gray-950 active:border-b-0 active:translate-y-1"
+                        >
+                            <RotateCcw size={24} className="text-neon-cyan" />
+                            <span>REROLL</span>
+                        </button>
+                        <button
+                            onClick={handleLock}
+                            className="flex-1 bg-neon-magenta hover:bg-neon-pink text-white font-bold py-4 rounded-xl flex flex-col items-center gap-2 border-b-4 border-purple-900 active:border-b-0 active:translate-y-1 transition-all shadow-[0_0_15px_rgba(255,0,255,0.4)]"
+                        >
+                            <Lock size={24} />
+                            <span>LOCK CARD</span>
+                        </button>
                     </div>
                 )}
-            </div>
 
-            {isBingo && (
-                <div className="fixed bottom-8 left-0 w-full px-6 z-30">
-                    <button
-                        onClick={triggerWin}
-                        className="w-full py-4 bg-gradient-to-r from-neon-magenta to-purple-600 text-white font-black text-2xl rounded-full shadow-[0_0_30px_rgba(255,0,255,0.6)] animate-bounce flex items-center justify-center gap-2"
-                    >
-                        <Trophy size={24} /> BINGO!
-                    </button>
-                </div>
-            )}
+                {/* STATUS MESSAGE */}
+                {myPlayer?.isLocked && !isBingo && (
+                    <div className="text-center p-4">
+                        <div className="inline-block bg-green-500/20 text-green-400 px-4 py-2 rounded-full text-sm font-bold border border-green-500/50 animate-pulse">
+                            CARD LOCKED • WAITING FOR NUMBERS
+                        </div>
+                    </div>
+                )}
 
-            <div className="mt-8 opacity-50"><BrandFooter /></div>
-        </div >
+                {/* BINGO BUTTON */}
+                {isBingo && (
+                    <div className="fixed bottom-20 left-0 right-0 p-4 z-50 flex justify-center pointer-events-none">
+                        <div className="pointer-events-auto animate-bounce">
+                            <button
+                                onClick={triggerWin}
+                                className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-4xl font-black px-12 py-6 rounded-2xl shadow-[0_0_50px_rgba(255,200,0,0.8)] border-4 border-white transform hover:scale-110 transition-all flex items-center gap-4"
+                            >
+                                <Trophy size={48} />
+                                BINGO!
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </main>
+
+            {myPlayer && <BrandFooter playerName={myPlayer.name} />}
+        </div>
     );
 };

@@ -1,20 +1,24 @@
-import { useEffect, useState } from 'react';
-import { Play, RotateCcw, Users, Unlock } from 'lucide-react';
-import { usePeerConnection } from '../../hooks/usePeerConnection';
+import { useEffect, useState, useRef } from 'react';
+import { Users, Play, Unlock, RotateCcw } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
-import { useSoundEffects } from '../../hooks/useSoundEffects';
-import { LotteryDrum } from './LotteryDrum';
+import { usePeerConnection } from '../../hooks/usePeerConnection';
 import { QRCodeDisplay } from './QRCodeDisplay';
 import { RecentNumbers } from './RecentNumbers';
+import { LotteryDrum } from './LotteryDrum';
+import { useSoundEffects } from '../../hooks/useSoundEffects';
+import FluidCanvas, { type FluidCanvasRef } from '../effects/FluidCanvas';
 import { BrandFooter } from '../shared/BrandFooter';
 
 // V4.1 STABLE: GLOBAL STORE ACCESS (Anti-Closure Fix)
 export const HostDashboard = () => {
     const { createRoom, connectionStatus, startGame } = usePeerConnection();
-    const { roomId, currentNumber, drawnNumbers, players, status, drawNumber: storeDrawNumber } = useGameStore();
-    const { playPop, playHorn, announceNumber, playRollingSound, playDingSound } = useSoundEffects();
+    const { roomId, currentNumber, drawnNumbers, players, status } = useGameStore();
+    const { playHorn, announceNumber, playRollingSound, playDingSound } = useSoundEffects();
 
     const [isRolling, setIsRolling] = useState(false);
+
+    // V6.0 FLUID REF
+    const fluidRef = useRef<FluidCanvasRef>(null);
 
     useEffect(() => {
         if (!roomId) createRoom();
@@ -34,6 +38,17 @@ export const HostDashboard = () => {
         console.log("⚡️ V4.1 GLOBAL DRAW TRIGGER");
 
         try {
+            // V6.0: FLUID EXPLOSION
+            if (fluidRef.current) {
+                // Multiple splats for "explosion" effect
+                for (let i = 0; i < 8; i++) {
+                    const angle = (Math.PI * 2 * i) / 8;
+                    const dx = Math.cos(angle) * 2000;
+                    const dy = Math.sin(angle) * 2000;
+                    fluidRef.current.splat(0.5, 0.5, dx, dy, [1.0, 0.0, 0.5]); // Neon Pink
+                }
+            }
+
             // 1. VISUAL START
             setIsRolling(true);
             useGameStore.getState().setRolling(true);
@@ -101,10 +116,17 @@ export const HostDashboard = () => {
         }
     };
 
+
+
     return (
-        <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
-            <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V5.7 (NUCLEAR)
+        <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative overflow-hidden">
+            {/* V6.0 FLUID BACKGROUND */}
+            <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen">
+                <FluidCanvas ref={fluidRef} />
+            </div>
+
+            <div className="fixed top-0 left-0 bg-blue-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
+                HOST V6.0 (FLUID)
             </div>
 
             {/* Sidebar */}
