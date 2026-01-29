@@ -154,6 +154,9 @@ export const PlayerDashboard = () => {
         }
     }, [joinRoom]);
 
+    // V4.5 Local History (The Permanent Notebook)
+    const [myHistory, setMyHistory] = useState<number[]>([]);
+
     useEffect(() => {
         if (currentNumber) {
             setLocalRolling(false);
@@ -161,19 +164,24 @@ export const PlayerDashboard = () => {
                 const strNum = currentNumber.toString();
                 const idx = localCardNumbers.findIndex(n => n.toString() === strNum);
 
-                // V4.4 PERMANENT FIX: Save to store immediately
+                // V4.5 HISTORY FIX: Add to local history (Append Only)
                 if (idx !== -1) {
-                    // Check if already marked to avoid loops
+                    setMyHistory(prev => {
+                        if (prev.includes(idx)) return prev;
+                        console.log("⚡️ V4.5 SAVING TO HISTORY:", idx);
+                        return [...prev, idx];
+                    });
+
+                    // Also try to save to store for sync consistency, but rely on myHistory for UI
                     if (myPlayer && !myPlayer.markedIndices.includes(idx)) {
-                        console.log("⚡️ V4.4 AUTO-SAVING MATCH:", idx);
                         const store = useGameStore.getState();
                         store.markNumber(myPlayer.id, idx);
-                        if (navigator.vibrate) navigator.vibrate(200);
                     }
+                    if (navigator.vibrate) navigator.vibrate(200);
                 }
             }
         }
-    }, [currentNumber, localCardNumbers]);
+    }, [currentNumber, localCardNumbers, myPlayer]);
 
     useEffect(() => {
         // Sync Visuals
@@ -240,7 +248,7 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-green-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V4.4 (PERMANENT)
+                PLAYER V4.5 (HISTORY)
             </div>
 
             {/* Connection Status Indicator */}
@@ -275,8 +283,8 @@ export const PlayerDashboard = () => {
             <div className="p-4 flex flex-col items-center gap-6 mt-4">
                 <BingoCard
                     numbers={displayCard}
-                    markedIndices={myPlayer?.markedIndices || []}
-                    currentNumber={currentNumber} // V4.2
+                    markedIndices={[...new Set([...(myPlayer?.markedIndices || []), ...myHistory])]} // V4.5 Merge History
+                    currentNumber={currentNumber}
                     onMark={handleMark}
                 />
 
