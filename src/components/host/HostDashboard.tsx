@@ -74,16 +74,18 @@ export const HostDashboard = () => {
                         isRolling: false
                     }));
 
-                    // 5. BROADCAST RESULT (Hard-Wired)
+                    // 5. HOST REVEAL (Immediate UI Update)
                     setIsRolling(false);
-                    try { playPop(); } catch (e) { }
+                    try { playDingSound(); } catch (e) { }
 
-                    const freshBroadcast = useGameStore.getState().broadcastEvent;
-                    if (freshBroadcast) {
-                        freshBroadcast({ type: 'DRAW_NUMBER', payload: newNum });
-                        announceNumber(newNum);
-                    }
-
+                    // 6. BROADCAST LATER (500ms Delay to prevent spoiler)
+                    setTimeout(() => {
+                        const freshBroadcast = useGameStore.getState().broadcastEvent;
+                        if (freshBroadcast) {
+                            freshBroadcast({ type: 'DRAW_NUMBER', payload: newNum });
+                            announceNumber(newNum);
+                        }
+                    }, 500);
                 } catch (innerError) {
                     console.error("Gen failed", innerError);
                     setIsRolling(false);
@@ -102,7 +104,7 @@ export const HostDashboard = () => {
         <div className="min-h-screen bg-deep-gray text-white p-8 grid grid-cols-12 gap-8 relative">
             {/* DEBUG TAG V4.1 */}
             <div className="fixed top-0 left-0 bg-red-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                HOST V4.1 (STABLE)
+                HOST V4.3 (NO SPOILERS)
             </div>
 
             {/* Sidebar */}

@@ -233,7 +233,7 @@ export const PlayerDashboard = () => {
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
             <div className="fixed top-0 right-0 bg-green-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V4.2 (AUTO-MARK)
+                PLAYER V4.3 (VISUAL FIX)
             </div>
 
             {/* Connection Status Indicator */}
