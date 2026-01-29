@@ -252,10 +252,13 @@ export const PlayerDashboard = () => {
 
     const isBingo = checkBingo(myPlayer?.markedIndices || []);
 
+    // DEBUG: Verify Lock State
+    console.log("Current Lock State:", myPlayer?.isLocked);
+
     return (
         <div className="min-h-screen bg-deep-gray text-white pb-32 relative">
-            <div className="fixed top-0 right-0 bg-green-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
-                PLAYER V5.2 (FIXED)
+            <div className="fixed top-0 right-0 bg-purple-600 text-white p-2 z-[9999] font-bold shadow-lg border-2 border-white">
+                PLAYER V5.3 (FIXED)
             </div>
 
             {/* Connection Status Indicator */}

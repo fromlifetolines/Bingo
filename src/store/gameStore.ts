@@ -126,9 +126,18 @@ export const useGameStore = create<GameState>()(
             },
 
             joinGame: (name, playerId) => set((state) => {
-                // Prevent duplicate join for same ID
-                if (state.players.some(p => p.id === playerId)) return state;
+                const existing = state.players.find(p => p.id === playerId);
 
+                // 1. DEDUPLICATION / UPDATE
+                if (existing) {
+                    return {
+                        players: state.players.map(p =>
+                            p.id === playerId ? { ...p, name } : p
+                        )
+                    };
+                }
+
+                // 2. ADD NEW
                 return {
                     players: [...state.players, {
                         id: playerId,
