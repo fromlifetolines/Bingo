@@ -126,18 +126,13 @@ export const useGameStore = create<GameState>()(
             },
 
             joinGame: (name, playerId) => set((state) => {
-                const existing = state.players.find(p => p.id === playerId);
-
-                // 1. DEDUPLICATION / UPDATE
-                if (existing) {
-                    return {
-                        players: state.players.map(p =>
-                            p.id === playerId ? { ...p, name } : p
-                        )
-                    };
+                // 1. STRICT DEDUPLICATION
+                // If player ID exists, we do NOTHING. This prevents "Infinite H" where re-joins add rows.
+                if (state.players.some(p => p.id === playerId)) {
+                    return state;
                 }
 
-                // 2. ADD NEW
+                // 2. ADD NEW ONLY
                 return {
                     players: [...state.players, {
                         id: playerId,
